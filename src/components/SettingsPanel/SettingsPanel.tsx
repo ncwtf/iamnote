@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 import { X, Pin, Power, Keyboard, Eye, Download, Upload, CheckCircle, AlertCircle, Cloud, FolderOpen, RefreshCw } from "lucide-react";
 import { useSettingsStore } from "../../store/settingsStore";
 import { useGroupStore } from "../../store/groupStore";
@@ -488,6 +489,8 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
     setAlwaysOnTop, setAutoStart,
     setShortcutAddTask, setShortcutToggleWindow,
   } = useSettingsStore();
+  const [appVersion, setAppVersion] = useState("");
+  useEffect(() => { getVersion().then(setAppVersion).catch(() => setAppVersion("0.1.0")); }, []);
 
   return (
     <div style={{
@@ -578,7 +581,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
 
       {/* 底部版本 & 作者 */}
       <div style={{ padding: "14px 20px 18px", textAlign: "center", flexShrink: 0, borderTop: "1px solid rgba(0,0,0,0.05)" }}>
-        <p style={{ fontSize: 13, fontWeight: 600, color: "#6B7280", marginBottom: 4 }}>iamnote v0.1.2</p>
+        <p style={{ fontSize: 13, fontWeight: 600, color: "#6B7280", marginBottom: 4 }}>iamnote v{appVersion}</p>
         <p style={{ fontSize: 11, color: "#C4C4C4", lineHeight: 1.7 }}>
           Made with ♥ by <span style={{ color: "#9CA3AF", fontWeight: 500 }}>Hunter</span>
         </p>
