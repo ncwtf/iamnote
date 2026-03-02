@@ -576,9 +576,15 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
         <SyncSection />
       </div>
 
-      {/* 底部版本 */}
-      <div style={{ padding: "16px 20px", textAlign: "center", flexShrink: 0 }}>
-        <p style={{ fontSize: 12, color: "#D1D5DB" }}>iamnote v0.1.0</p>
+      {/* 底部版本 & 作者 */}
+      <div style={{ padding: "14px 20px 18px", textAlign: "center", flexShrink: 0, borderTop: "1px solid rgba(0,0,0,0.05)" }}>
+        <p style={{ fontSize: 13, fontWeight: 600, color: "#6B7280", marginBottom: 4 }}>iamnote v0.1.2</p>
+        <p style={{ fontSize: 11, color: "#C4C4C4", lineHeight: 1.7 }}>
+          Made with ♥ by <span style={{ color: "#9CA3AF", fontWeight: 500 }}>Hunter</span>
+        </p>
+        <p style={{ fontSize: 11, color: "#D1D5DB", marginTop: 2 }}>
+          I AM NOTE is a simple and powerful task management tool.
+        </p>
       </div>
     </div>
   );
