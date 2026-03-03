@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Plus, Trash2, Check, Pencil, ChevronLeft, ChevronRight, Star, Archive } from "lucide-react";
+import { Plus, Trash2, Check, Pencil, ChevronLeft, ChevronRight, Star, Archive, LayoutList } from "lucide-react";
 import { useGroupStore } from "../../store/groupStore";
 import { useTaskStore } from "../../store/taskStore";
 import { useArchiveStore } from "../../store/archiveStore";
-import { GROUP_COLORS, FAVORITES_GROUP_ID, ARCHIVE_GROUP_ID } from "../../types";
+import { GROUP_COLORS, FAVORITES_GROUP_ID, ARCHIVE_GROUP_ID, OVERVIEW_GROUP_ID } from "../../types";
 
 interface GroupSidebarProps {
   width: number;
@@ -36,8 +36,9 @@ export function GroupSidebar({ width, onWidthChange, collapsed, onCollapsedChang
   useEffect(() => { if (editingId) editInputRef.current?.focus(); }, [editingId]);
 
   const favCount = getFavoritedTasks().length;
-  const isFavActive = activeGroupId === FAVORITES_GROUP_ID;
-  const isArchiveActive = activeGroupId === ARCHIVE_GROUP_ID;
+  const isFavActive      = activeGroupId === FAVORITES_GROUP_ID;
+  const isArchiveActive  = activeGroupId === ARCHIVE_GROUP_ID;
+  const isOverviewActive = activeGroupId === OVERVIEW_GROUP_ID;
   const totalArchived = archives.reduce((sum, a) => sum + a.tasks.length, 0);
 
   const handleAdd = () => {
@@ -120,6 +121,22 @@ export function GroupSidebar({ width, onWidthChange, collapsed, onCollapsedChang
           }}
         >
           <Archive size={11} color={isArchiveActive ? "#fff" : "#999"} />
+        </button>
+
+        {/* 总览 dot */}
+        <button
+          title="任务总览"
+          onClick={() => setActive(OVERVIEW_GROUP_ID)}
+          style={{
+            width: 22, height: 22, borderRadius: "50%",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            backgroundColor: isOverviewActive ? "#10B981" : "#E5E7EB",
+            border: `2.5px solid ${isOverviewActive ? "#fff" : "transparent"}`,
+            boxShadow: isOverviewActive ? "0 0 0 2px #10B981" : "none",
+            transition: "all 0.15s",
+          }}
+        >
+          <LayoutList size={11} color={isOverviewActive ? "#fff" : "#999"} />
         </button>
 
         <div className="flex flex-col gap-2.5 mt-1">
@@ -234,6 +251,27 @@ export function GroupSidebar({ width, onWidthChange, collapsed, onCollapsedChang
                   {totalArchived}
                 </span>
               )}
+            </div>
+          </div>
+
+          {/* 总览 */}
+          <div style={{ padding: "0 8px", marginBottom: 4 }}>
+            <div
+              onClick={() => { setActive(OVERVIEW_GROUP_ID); setEditingId(null); setColorPickerFor(null); }}
+              style={{
+                display: "flex", alignItems: "center", gap: 10,
+                borderRadius: 8, padding: "7px 10px", cursor: "pointer",
+                background: isOverviewActive ? "#fff" : "transparent",
+                boxShadow: isOverviewActive ? "0 1px 4px rgba(0,0,0,0.10)" : "none",
+                transition: "all 0.15s",
+              }}
+              onMouseEnter={(e) => { if (!isOverviewActive) (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.04)"; }}
+              onMouseLeave={(e) => { if (!isOverviewActive) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+            >
+              <LayoutList size={13} color="#10B981" style={{ flexShrink: 0 }} />
+              <span style={{ flex: 1, fontSize: 13, fontWeight: isOverviewActive ? 600 : 400, color: isOverviewActive ? "#1c1c1e" : "#555" }}>
+                总览
+              </span>
             </div>
           </div>
 

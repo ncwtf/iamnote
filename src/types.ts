@@ -1,5 +1,6 @@
 export const FAVORITES_GROUP_ID = "__favorites__";
-export const ARCHIVE_GROUP_ID = "__archive__";
+export const ARCHIVE_GROUP_ID  = "__archive__";
+export const OVERVIEW_GROUP_ID = "__overview__";
 
 export interface Group {
   id: string;
@@ -12,31 +13,49 @@ export interface Task {
   id: string;
   groupId: string;
   title: string;
-  detail: string;             // Markdown 详细信息
+  detail: string;
   status: "todo" | "in-progress" | "done";
   pinned: boolean;
   favorited: boolean;
   order: number;
   createdAt: string;
   completedAt: string | null;
+
+  // ── 可选高级设置（默认均关闭） ──────────────────
+  /** 循环计数：每次完成 +1，完成后自动重置为 todo */
+  recurringEnabled: boolean;
+  /** 累计完成次数 */
+  recurringCount: number;
+
+  /** 定时提醒：到达该时间点弹出提示 */
+  reminderAt: string | null;
+  /** 提醒是否已触发（防止重复弹出） */
+  reminderFired: boolean;
+
+  /** 周期循环：完成后在下个周期自动复原 */
+  periodicEnabled: boolean;
+  periodicType: "daily" | "weekly" | "monthly" | "yearly";
+  periodicInterval: number;
+  /** 下次到期时间（仅 periodicEnabled 时有意义） */
+  nextDueAt: string | null;
 }
 
-/** 归档后的任务快照（保存分组信息，防止分组被删后丢失） */
+/** 归档后的任务快照 */
 export interface ArchivedTask {
-  id: string;          // 原任务 ID
+  id: string;
   groupId: string;
-  groupName: string;   // 快照，分组名
-  groupColor: string;  // 快照，分组颜色
+  groupName: string;
+  groupColor: string;
   title: string;
+  detail: string;        // 任务详情快照
   createdAt: string;
   completedAt: string | null;
-  archivedAt: string;  // 归档时间
+  archivedAt: string;
 }
 
-/** 某一归档月份 */
 export interface ArchiveMonth {
-  yearMonth: string;   // "2024-01"
-  label: string;       // "2024年1月"
+  yearMonth: string;
+  label: string;
   tasks: ArchivedTask[];
 }
 
@@ -49,7 +68,7 @@ export interface Settings {
   syncFolderPath: string;
   syncLastModifiedAt: string | null;
   syncLastSyncedAt: string | null;
-  lastAutoArchiveMonth: string | null; // "2024-01"，防止重复自动归档
+  lastAutoArchiveMonth: string | null;
 }
 
 export const STATUS_LABELS: Record<Task["status"], string> = {
@@ -61,25 +80,49 @@ export const STATUS_LABELS: Record<Task["status"], string> = {
 export const STATUS_CYCLE: Task["status"][] = ["todo", "in-progress", "done"];
 
 export const GROUP_COLORS = [
-  "#f59e0b",
-  "#10b981",
-  "#3b82f6",
-  "#8b5cf6",
-  "#ef4444",
-  "#ec4899",
-  "#06b6d4",
-  "#84cc16",
+  "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6",
+  "#ef4444", "#ec4899", "#06b6d4", "#84cc16",
 ];
 
-// ── 归档工具函数 ─────────────────────────────────────────────
+// ── 工具函数 ──────────────────────────────────────────────
 
-/** 由 Date 生成 "YYYY-MM" */
 export function toYearMonth(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
-/** 由 "YYYY-MM" 生成展示标签，如 "2024年1月" */
 export function yearMonthLabel(ym: string): string {
   const [y, m] = ym.split("-");
   return `${y}年${parseInt(m)}月`;
 }
+
+/** 计算下一个周期的到期时间 */
+export function calcNextDue(
+  from: Date,
+  periodicType: Task["periodicType"],
+  periodicInterval: number
+): Date {
+  const d = new Date(from);
+  switch (periodicType) {
+    case "daily":   d.setDate(d.getDate() + periodicInterval); break;
+    case "weekly":  d.setDate(d.getDate() + periodicInterval * 7); break;
+    case "monthly": d.setMonth(d.getMonth() + periodicInterval); break;
+    case "yearly":  d.setFullYear(d.getFullYear() + periodicInterval); break;
+  }
+  return d;
+}
+
+/** 任务的新字段默认值（兼容旧数据用） */
+export const TASK_META_DEFAULTS: Pick<Task,
+  "recurringEnabled" | "recurringCount" |
+  "reminderAt" | "reminderFired" |
+  "periodicEnabled" | "periodicType" | "periodicInterval" | "nextDueAt"
+> = {
+  recurringEnabled: false,
+  recurringCount: 0,
+  reminderAt: null,
+  reminderFired: false,
+  periodicEnabled: false,
+  periodicType: "yearly",
+  periodicInterval: 1,
+  nextDueAt: null,
+};

@@ -1,6 +1,7 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Pin, Settings, Minus, X } from "lucide-react";
 import { useSettingsStore } from "../../store/settingsStore";
+import { useRef, useEffect } from "react";
 
 interface TitleBarProps {
   onSettingsClick: () => void;
@@ -17,20 +18,34 @@ function hexToRgb(hex: string) {
 export function TitleBar({ onSettingsClick, groupColor }: TitleBarProps) {
   const { settings, setAlwaysOnTop } = useSettingsStore();
   const win = getCurrentWindow();
+  const dragRef = useRef<HTMLDivElement>(null);
 
   const rgb = hexToRgb(groupColor.startsWith("#") ? groupColor : "#f59e0b");
 
-  // 拖动双保险：data-tauri-drag-region（声明式）+ startDragging()（命令式）
-  const handleDragMouseDown = (e: React.MouseEvent) => {
-    if (e.buttons === 1) {
-      void win.startDragging();
-    }
-  };
+  /**
+   * 用原生 addEventListener 绑定（而非 React 合成事件），避免 React 批处理带来的
+   * 微小延迟。不与 data-tauri-drag-region 同时调用 startDragging()，防止两者竞争。
+   * data-tauri-drag-region 保留用于告知 Tauri 哪个区域是可拖动区，
+   * 实际拖动由原生 mousedown 回调触发。
+   */
+  useEffect(() => {
+    const el = dragRef.current;
+    if (!el) return;
+    const onDown = (e: MouseEvent) => {
+      // 只响应左键，且不在按钮子元素上
+      if (e.button !== 0) return;
+      const target = e.target as HTMLElement;
+      if (target.closest("[data-tauri-no-drag]")) return;
+      win.startDragging().catch(() => {});
+    };
+    el.addEventListener("mousedown", onDown);
+    return () => el.removeEventListener("mousedown", onDown);
+  }, [win]);
 
   return (
     <div
+      ref={dragRef}
       data-tauri-drag-region
-      onMouseDown={handleDragMouseDown}
       className="flex items-center select-none flex-shrink-0"
       style={{
         height: 52,
@@ -38,6 +53,8 @@ export function TitleBar({ onSettingsClick, groupColor }: TitleBarProps) {
         borderRadius: "12px 12px 0 0",
         padding: "0 12px",
         cursor: "grab",
+        WebkitUserSelect: "none",
+        userSelect: "none",
       }}
     >
       {/* Logo + 标题 —— pointer-events-none 让事件穿透给父层 drag-region */}
@@ -56,12 +73,11 @@ export function TitleBar({ onSettingsClick, groupColor }: TitleBarProps) {
         </span>
       </div>
 
-      {/* 按钮区域：阻止 mousedown 冒泡，避免触发拖动 */}
+      {/* 按钮区域：data-tauri-no-drag + closest 检测排除，不触发拖动 */}
       <div
         data-tauri-no-drag
         className="flex items-center gap-0.5"
         style={{ cursor: "default" }}
-        onMouseDown={(e) => e.stopPropagation()}
       >
         <TitleButton
           onClick={() => setAlwaysOnTop(!settings.alwaysOnTop)}

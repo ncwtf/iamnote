@@ -1,14 +1,32 @@
 import { Archive, ChevronDown, ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useArchiveStore } from "../../store/archiveStore";
 import { useTaskStore } from "../../store/taskStore";
 import { useGroupStore } from "../../store/groupStore";
 import { useSettingsStore } from "../../store/settingsStore";
 import { ArchivedTask, toYearMonth } from "../../types";
+import { HoverPreview } from "../TaskList/FloatDetailPanel";
 
 // ── 已归档任务行（只读） ──────────────────────────────────────
 function ArchivedTaskRow({ task }: { task: ArchivedTask }) {
   const [expanded, setExpanded] = useState(false);
+  const rowRef = useRef<HTMLDivElement>(null);
+  const [previewRect, setPreviewRect] = useState<DOMRect | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const hasDetail = !!task.detail?.trim();
+
+  const showPreview = () => {
+    if (!hasDetail) return;
+    timerRef.current = setTimeout(() => {
+      const rect = rowRef.current?.getBoundingClientRect();
+      if (rect) setPreviewRect(rect);
+    }, 350);
+  };
+  const hidePreview = () => {
+    clearTimeout(timerRef.current!);
+    setPreviewRect(null);
+  };
 
   function fmt(iso: string | null) {
     if (!iso) return null;
@@ -17,61 +35,87 @@ function ArchivedTaskRow({ task }: { task: ArchivedTask }) {
   }
 
   return (
-    <div
-      style={{
-        padding: "9px 18px",
-        borderBottom: "1px solid rgba(0,0,0,0.04)",
-        cursor: "pointer",
-      }}
-      onClick={() => setExpanded((v) => !v)}
-      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.02)"; }}
-      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        {/* 完成勾 */}
-        <div style={{
-          width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
-          backgroundColor: task.groupColor, display: "flex", alignItems: "center", justifyContent: "center",
-        }}>
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-            <path d="M1.5 5L4 7.5L8.5 2.5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+    <>
+      <div
+        ref={rowRef}
+        style={{
+          padding: "9px 18px",
+          borderBottom: "1px solid rgba(0,0,0,0.04)",
+          cursor: "pointer",
+        }}
+        onClick={() => setExpanded((v) => !v)}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.02)";
+          showPreview();
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLElement).style.background = "transparent";
+          hidePreview();
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {/* 完成勾 */}
+          <div style={{
+            width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
+            backgroundColor: task.groupColor, display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+              <path d="M1.5 5L4 7.5L8.5 2.5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+
+          <span style={{
+            flex: 1, fontSize: 14, color: "#9CA3AF",
+            textDecoration: "line-through", textDecorationColor: "#D1D5DB",
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          }}>
+            {task.title}
+          </span>
+
+          {/* 详情指示点 */}
+          {hasDetail && (
+            <div title="有备注" style={{
+              width: 6, height: 6, borderRadius: "50%",
+              background: task.groupColor, opacity: 0.5, flexShrink: 0,
+            }} />
+          )}
+
+          {/* 分组徽标 */}
+          <span style={{
+            fontSize: 11, fontWeight: 600, color: task.groupColor,
+            background: `${task.groupColor}18`, borderRadius: 4, padding: "1px 6px",
+            flexShrink: 0,
+          }}>
+            {task.groupName}
+          </span>
+
+          {/* 展开/收起 */}
+          {expanded
+            ? <ChevronDown size={12} color="#D1D5DB" style={{ flexShrink: 0 }} />
+            : <ChevronRight size={12} color="#D1D5DB" style={{ flexShrink: 0 }} />}
         </div>
 
-        <span style={{
-          flex: 1, fontSize: 14, color: "#9CA3AF",
-          textDecoration: "line-through", textDecorationColor: "#D1D5DB",
-          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-        }}>
-          {task.title}
-        </span>
-
-        {/* 分组徽标 */}
-        <span style={{
-          fontSize: 11, fontWeight: 600, color: task.groupColor,
-          background: `${task.groupColor}18`, borderRadius: 4, padding: "1px 6px",
-          flexShrink: 0,
-        }}>
-          {task.groupName}
-        </span>
-
-        {/* 展开/收起 */}
-        {expanded
-          ? <ChevronDown size={12} color="#D1D5DB" style={{ flexShrink: 0 }} />
-          : <ChevronRight size={12} color="#D1D5DB" style={{ flexShrink: 0 }} />}
+        {/* 时间信息（展开显示） */}
+        {expanded && (
+          <div style={{ marginTop: 6, marginLeft: 30, display: "flex", gap: 16 }}>
+            <span style={{ fontSize: 11, color: "#C4C4C4" }}>创建 {fmt(task.createdAt)}</span>
+            {task.completedAt && (
+              <span style={{ fontSize: 11, color: "#86EFAC" }}>完成 {fmt(task.completedAt)}</span>
+            )}
+            <span style={{ fontSize: 11, color: "#D1B8FF" }}>归档 {fmt(task.archivedAt)}</span>
+          </div>
+        )}
       </div>
 
-      {/* 时间信息（展开显示） */}
-      {expanded && (
-        <div style={{ marginTop: 6, marginLeft: 30, display: "flex", gap: 16 }}>
-          <span style={{ fontSize: 11, color: "#C4C4C4" }}>创建 {fmt(task.createdAt)}</span>
-          {task.completedAt && (
-            <span style={{ fontSize: 11, color: "#86EFAC" }}>完成 {fmt(task.completedAt)}</span>
-          )}
-          <span style={{ fontSize: 11, color: "#D1B8FF" }}>归档 {fmt(task.archivedAt)}</span>
-        </div>
+      {/* 悬停详情预览 */}
+      {previewRect && hasDetail && (
+        <HoverPreview
+          accentColor={task.groupColor}
+          anchorRect={previewRect}
+          content={task.detail}
+        />
       )}
-    </div>
+    </>
   );
 }
 

@@ -21,6 +21,12 @@ fn file_exists(path: String) -> bool {
     std::path::Path::new(&path).exists()
 }
 
+/// 打开 DevTools 控制台
+#[tauri::command]
+fn open_devtools(window: tauri::WebviewWindow) {
+    window.open_devtools();
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -34,7 +40,8 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .invoke_handler(tauri::generate_handler![write_file, read_file, file_exists])
+        .plugin(tauri_plugin_notification::init())
+        .invoke_handler(tauri::generate_handler![write_file, read_file, file_exists, open_devtools])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

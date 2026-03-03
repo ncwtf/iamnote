@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect, forwardRef } from "react";
-import { Pin, Trash2, Pencil, Star, FileText, ChevronRight } from "lucide-react";
+import { Pin, Trash2, Pencil, Star, FileText, ChevronRight, Settings2, Bell, RotateCcw, CalendarClock } from "lucide-react";
 import { Task } from "../../types";
 import { useTaskStore } from "../../store/taskStore";
 import { FloatDetailPanel, HoverPreview } from "./FloatDetailPanel";
+import { TaskOptionsPanel } from "./TaskOptionsPanel";
 
 interface TaskItemProps {
   task: Task;
@@ -89,11 +90,11 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge }: Tas
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showPreview = () => {
-    if (!task.detail?.trim() || compact) return;
+    if (!task.detail?.trim()) return;
     previewTimerRef.current = setTimeout(() => {
       const rect = taskRef.current?.getBoundingClientRect();
       if (rect) setPreviewRect(rect);
-    }, 350); // 延迟 350ms，避免快速划过时频繁弹出
+    }, 350);
   };
 
   const hidePreview = () => {
@@ -107,14 +108,28 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge }: Tas
   const chevronBtnRef = useRef<HTMLButtonElement>(null);
 
   const openEdit = (ref: React.RefObject<HTMLButtonElement | null>) => {
-    hidePreview(); // 打开编辑时关闭预览
+    hidePreview();
     const rect = ref.current?.getBoundingClientRect();
     if (rect) setEditAnchor(rect);
   };
 
+  // 任务选项浮窗
+  const [optionsAnchor, setOptionsAnchor] = useState<DOMRect | null>(null);
+  const optionsBtnRef = useRef<HTMLButtonElement>(null);
+
+  const openOptions = () => {
+    const rect = optionsBtnRef.current?.getBoundingClientRect();
+    if (rect) setOptionsAnchor(rect);
+  };
+
   const hasDetail = !!(task.detail?.trim());
   const isDone = task.status === "done";
-  const py = compact ? 8 : 10;
+  const py = compact ? 6 : 10;
+
+  // meta 指示器
+  const hasRecurring = task.recurringEnabled;
+  const hasPeriodic  = task.periodicEnabled;
+  const hasReminder  = !!task.reminderAt && !task.reminderFired;
 
   return (
     <>
@@ -197,30 +212,46 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge }: Tas
               )}
             </div>
 
-            {/* 标签 */}
+            {/* 标签行（含 meta 指示器） */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: compact ? 2 : 4, paddingLeft: compact ? 0 : 17 }}>
+              {groupBadge && (
+                <span style={{ fontSize: 11, fontWeight: 600, color: groupBadge.color, background: `${groupBadge.color}18`, borderRadius: 4, padding: "1px 6px" }}>
+                  {groupBadge.name}
+                </span>
+              )}
+              {!compact && task.status === "in-progress" && (
+                <span style={{ fontSize: 11, fontWeight: 600, color: "#D97706", background: "#FFF8E8", borderRadius: 4, padding: "1px 6px" }}>进行中</span>
+              )}
+              {!compact && task.pinned && (
+                <span style={{ fontSize: 11, fontWeight: 600, color: "#3B82F6", background: "#EFF6FF", borderRadius: 4, padding: "1px 6px" }}>置顶</span>
+              )}
+              {/* meta 小标签 */}
+              {hasRecurring && (
+                <span title={`已完成 ${task.recurringCount} 次`} style={{ fontSize: 11, fontWeight: 600, color: "#3B82F6", background: "#EFF6FF", borderRadius: 4, padding: "1px 6px", display: "flex", alignItems: "center", gap: 3 }}>
+                  <RotateCcw size={10} /> {task.recurringCount > 0 ? `×${task.recurringCount}` : "循环"}
+                </span>
+              )}
+              {hasReminder && (
+                <span title={`提醒：${fmtDatetime(task.reminderAt!)}`} style={{ fontSize: 11, fontWeight: 600, color: "#F59E0B", background: "#FFF8E8", borderRadius: 4, padding: "1px 6px", display: "flex", alignItems: "center", gap: 3 }}>
+                  <Bell size={10} /> {fmtDatetime(task.reminderAt!)}
+                </span>
+              )}
+              {hasPeriodic && task.nextDueAt && (
+                <span title={`下次：${fmtDatetime(task.nextDueAt)}`} style={{ fontSize: 11, fontWeight: 600, color: "#8B5CF6", background: "#F5F3FF", borderRadius: 4, padding: "1px 6px", display: "flex", alignItems: "center", gap: 3 }}>
+                  <CalendarClock size={10} /> {fmtDatetime(task.nextDueAt)}
+                </span>
+              )}
+            </div>
+
+            {/* 时间 */}
             {!compact && (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 4, paddingLeft: 17 }}>
-                {groupBadge && (
-                  <span style={{ fontSize: 11, fontWeight: 600, color: groupBadge.color, background: `${groupBadge.color}18`, borderRadius: 4, padding: "1px 6px" }}>
-                    {groupBadge.name}
-                  </span>
-                )}
-                {task.status === "in-progress" && (
-                  <span style={{ fontSize: 11, fontWeight: 600, color: "#D97706", background: "#FFF8E8", borderRadius: 4, padding: "1px 6px" }}>进行中</span>
-                )}
-                {task.pinned && (
-                  <span style={{ fontSize: 11, fontWeight: 600, color: "#3B82F6", background: "#EFF6FF", borderRadius: 4, padding: "1px 6px" }}>置顶</span>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 3, paddingLeft: 17 }}>
+                <span style={{ fontSize: 11, color: "#C4C4C4" }}>创建 {fmt(task.createdAt)}</span>
+                {task.completedAt && (
+                  <span style={{ fontSize: 11, color: "#86EFAC" }}>完成 {fmt(task.completedAt)}</span>
                 )}
               </div>
             )}
-
-            {/* 时间 */}
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: compact ? 2 : 4, paddingLeft: compact ? 0 : 17 }}>
-              <span style={{ fontSize: 11, color: "#C4C4C4" }}>创建 {fmt(task.createdAt)}</span>
-              {task.completedAt && (
-                <span style={{ fontSize: 11, color: "#86EFAC" }}>完成 {fmt(task.completedAt)}</span>
-              )}
-            </div>
           </div>
 
           {/* 操作按钮：hover 渐显 */}
@@ -242,15 +273,25 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge }: Tas
             <ActionBtn onClick={() => toggleFavorite(task.id)} title={task.favorited ? "取消收藏" : "收藏"} active={task.favorited} activeColor="#F59E0B">
               <Star size={13} fill={task.favorited ? "#F59E0B" : "none"} />
             </ActionBtn>
+            {/* 备注按钮（compact 下也保留，Feature 5） */}
+            <ActionBtn
+              ref={detailBtnRef}
+              onClick={() => openEdit(detailBtnRef)}
+              title="查看/编辑备注"
+              active={!!editAnchor}
+              activeColor={accentColor}
+            >
+              <FileText size={13} />
+            </ActionBtn>
             {!compact && (
               <ActionBtn
-                ref={detailBtnRef}
-                onClick={() => openEdit(detailBtnRef)}
-                title="查看/编辑备注"
-                active={!!editAnchor}
-                activeColor={accentColor}
+                ref={optionsBtnRef}
+                onClick={openOptions}
+                title="任务选项（循环/提醒/周期）"
+                active={!!optionsAnchor}
+                activeColor="#6B7280"
               >
-                <FileText size={13} />
+                <Settings2 size={13} />
               </ActionBtn>
             )}
             <ActionBtn onClick={() => deleteTask(task.id)} title="删除" danger>
@@ -260,7 +301,7 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge }: Tas
         </div>
       </div>
 
-      {/* 悬停预览气泡（只读，pointerEvents:none，不干扰鼠标事件） */}
+      {/* 悬停预览气泡（普通任务 + 已完成区均支持） */}
       {previewRect && !editAnchor && hasDetail && (
         <HoverPreview
           accentColor={accentColor}
@@ -269,8 +310,8 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge }: Tas
         />
       )}
 
-      {/* 点击触发的编辑浮窗 */}
-      {editAnchor && !compact && (
+      {/* 点击触发的备注编辑浮窗（compact 模式也支持，Feature 5） */}
+      {editAnchor && (
         <FloatDetailPanel
           task={task}
           accentColor={accentColor}
@@ -278,8 +319,22 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge }: Tas
           onClose={() => setEditAnchor(null)}
         />
       )}
+
+      {/* 任务选项浮窗 */}
+      {optionsAnchor && (
+        <TaskOptionsPanel
+          task={task}
+          anchorRect={optionsAnchor}
+          onClose={() => setOptionsAnchor(null)}
+        />
+      )}
     </>
   );
+}
+
+function fmtDatetime(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
 // ── 操作按钮 ──────────────────────────────────────────────

@@ -51,6 +51,11 @@ button { cursor: pointer; }
   to   { transform: rotate(360deg); }
 }
 
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
 /* ── Markdown 详情渲染样式 ────────────────────────────────── */
 .md-content { word-break: break-word; }
 .md-content h1, .md-content h2, .md-content h3 {

@@ -44,6 +44,7 @@ export const useArchiveStore = create<ArchiveState>((set, get) => ({
         groupName: g?.name ?? "已删除分组",
         groupColor: g?.color ?? "#9CA3AF",
         title: t.title,
+        detail: t.detail ?? "",
         createdAt: t.createdAt,
         completedAt: t.completedAt,
         archivedAt: now,

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { v4 as uuidv4 } from "uuid";
-import { Task, STATUS_CYCLE } from "../types";
+import { Task, STATUS_CYCLE, TASK_META_DEFAULTS, calcNextDue } from "../types";
 import { storageGet, storageSet } from "../lib/storage";
 
 interface TaskState {
@@ -16,6 +16,7 @@ interface TaskState {
   toggleFavorite: (id: string) => void;
   getGroupTasks: (groupId: string) => Task[];
   getFavoritedTasks: () => Task[];
+  getAllTasksSorted: () => Task[];
   replaceAll: (tasks: Task[]) => Promise<void>;
 }
 
@@ -25,8 +26,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
   load: async () => {
     const saved = await storageGet<Task[]>("tasks");
-    // 兼容旧数据：补齐新字段默认值
     const tasks = (saved ?? []).map((t) => ({
+      ...TASK_META_DEFAULTS,
       ...t,
       favorited: t.favorited ?? false,
       completedAt: t.completedAt ?? null,
@@ -49,6 +50,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       order: groupTasks.length,
       createdAt: new Date().toISOString(),
       completedAt: null,
+      ...TASK_META_DEFAULTS,
     };
     const updated = [...tasks, newTask];
     set({ tasks: updated });
@@ -72,10 +74,33 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     if (!task) return;
     const currentIndex = STATUS_CYCLE.indexOf(task.status);
     const nextStatus = STATUS_CYCLE[(currentIndex + 1) % STATUS_CYCLE.length];
-    const patch: Partial<Task> = { status: nextStatus };
-    // 切换到 done 时记录完成时间
-    if (nextStatus === "done") patch.completedAt = new Date().toISOString();
-    get().updateTask(id, patch);
+
+    if (nextStatus === "done") {
+      if (task.recurringEnabled) {
+        // 循环计数：完成次数 +1，重置回 todo
+        const patch: Partial<Task> = {
+          status: "todo",
+          completedAt: new Date().toISOString(),
+          recurringCount: task.recurringCount + 1,
+        };
+        // 周期循环：同时更新下次到期时间
+        if (task.periodicEnabled) {
+          patch.nextDueAt = calcNextDue(
+            new Date(),
+            task.periodicType,
+            task.periodicInterval
+          ).toISOString();
+          patch.reminderAt = patch.nextDueAt;
+          patch.reminderFired = false;
+        }
+        get().updateTask(id, patch);
+        return;
+      }
+      // 普通任务完成
+      get().updateTask(id, { status: "done", completedAt: new Date().toISOString() });
+    } else {
+      get().updateTask(id, { status: nextStatus });
+    }
   },
 
   reverseCycleStatus: (id) => {
@@ -101,11 +126,12 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   },
 
   getGroupTasks: (groupId) => {
-    const tasks = get().tasks.filter((t) => t.groupId === groupId);
-    return tasks.sort((a, b) => {
-      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-      return a.order - b.order;
-    });
+    return get().tasks
+      .filter((t) => t.groupId === groupId)
+      .sort((a, b) => {
+        if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+        return a.order - b.order;
+      });
   },
 
   getFavoritedTasks: () => {
@@ -116,6 +142,14 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
         return a.order - b.order;
       });
+  },
+
+  getAllTasksSorted: () => {
+    return get().tasks.slice().sort((a, b) => {
+      if (a.groupId !== b.groupId) return a.groupId.localeCompare(b.groupId);
+      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+      return a.order - b.order;
+    });
   },
 
   replaceAll: async (tasks) => {
