@@ -167,7 +167,7 @@ export function TaskOptionsPanel({ task, anchorRect, onClose }: TaskOptionsPanel
         <div style={{ paddingLeft: 28, marginTop: -8 }}>
           <input
             type="datetime-local"
-            value={task.reminderAt ? task.reminderAt.slice(0, 16) : ""}
+            value={task.reminderAt ? toLocalInputValue(task.reminderAt) : ""}
             onChange={(e) => {
               const v = e.target.value;
               set({ reminderAt: v ? new Date(v).toISOString() : null, reminderFired: false });
@@ -226,6 +226,16 @@ export function TaskOptionsPanel({ task, anchorRect, onClose }: TaskOptionsPanel
 function fmtDatetime(iso: string): string {
   const d = new Date(iso);
   return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+/**
+ * 将 UTC ISO 字符串转换为 datetime-local 输入框所需的本地时间格式
+ * （输入框不理解时区，只接受 "YYYY-MM-DDTHH:mm" 形式的本地时间字符串）
+ */
+function toLocalInputValue(isoUtc: string): string {
+  const d = new Date(isoUtc);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function OptionRow({ icon, label, desc, checked, onToggle, color, noToggle }: {

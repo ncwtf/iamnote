@@ -254,26 +254,38 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge }: Tas
             )}
           </div>
 
-          {/* 操作按钮：hover 渐显 */}
+          {/* 操作按钮：hover 渐显，2×3（普通）/ 2×2（compact）网格 */}
           <div style={{
-            display: "flex", alignItems: "center", gap: 2,
-            flexShrink: 0, paddingTop: 1,
+            display: "grid",
+            gridTemplateColumns: compact ? "repeat(2, 30px)" : "repeat(3, 30px)",
+            gridTemplateRows:    compact ? "repeat(2, 30px)" : "repeat(2, 30px)",
+            gap: 2,
+            flexShrink: 0,
+            alignSelf: "center",
             opacity: hovered ? 1 : 0,
             transition: "opacity 0.15s",
             pointerEvents: hovered ? "auto" : "none",
           }}>
+            {/* 行1 */}
             <ActionBtn onClick={() => { setIsEditing(true); setEditTitle(task.title); }} title="编辑标题">
-              <Pencil size={13} />
+              <Pencil size={15} />
             </ActionBtn>
-            {!compact && (
-              <ActionBtn onClick={() => togglePin(task.id)} title={task.pinned ? "取消置顶" : "置顶"} active={task.pinned} activeColor="#3B82F6">
-                <Pin size={13} />
+            {compact ? (
+              <ActionBtn onClick={() => toggleFavorite(task.id)} title={task.favorited ? "取消收藏" : "收藏"} active={task.favorited} activeColor="#F59E0B">
+                <Star size={15} fill={task.favorited ? "#F59E0B" : "none"} />
               </ActionBtn>
+            ) : (
+              <>
+                <ActionBtn onClick={() => togglePin(task.id)} title={task.pinned ? "取消置顶" : "置顶"} active={task.pinned} activeColor="#3B82F6">
+                  <Pin size={15} />
+                </ActionBtn>
+                <ActionBtn onClick={() => toggleFavorite(task.id)} title={task.favorited ? "取消收藏" : "收藏"} active={task.favorited} activeColor="#F59E0B">
+                  <Star size={15} fill={task.favorited ? "#F59E0B" : "none"} />
+                </ActionBtn>
+              </>
             )}
-            <ActionBtn onClick={() => toggleFavorite(task.id)} title={task.favorited ? "取消收藏" : "收藏"} active={task.favorited} activeColor="#F59E0B">
-              <Star size={13} fill={task.favorited ? "#F59E0B" : "none"} />
-            </ActionBtn>
-            {/* 备注按钮（compact 下也保留，Feature 5） */}
+
+            {/* 行2 */}
             <ActionBtn
               ref={detailBtnRef}
               onClick={() => openEdit(detailBtnRef)}
@@ -281,22 +293,28 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge }: Tas
               active={!!editAnchor}
               activeColor={accentColor}
             >
-              <FileText size={13} />
+              <FileText size={15} />
             </ActionBtn>
-            {!compact && (
-              <ActionBtn
-                ref={optionsBtnRef}
-                onClick={openOptions}
-                title="任务选项（循环/提醒/周期）"
-                active={!!optionsAnchor}
-                activeColor="#6B7280"
-              >
-                <Settings2 size={13} />
+            {compact ? (
+              <ActionBtn onClick={() => deleteTask(task.id)} title="删除" danger>
+                <Trash2 size={15} />
               </ActionBtn>
+            ) : (
+              <>
+                <ActionBtn
+                  ref={optionsBtnRef}
+                  onClick={openOptions}
+                  title="任务选项（循环/提醒/周期）"
+                  active={!!optionsAnchor}
+                  activeColor="#6B7280"
+                >
+                  <Settings2 size={15} />
+                </ActionBtn>
+                <ActionBtn onClick={() => deleteTask(task.id)} title="删除" danger>
+                  <Trash2 size={15} />
+                </ActionBtn>
+              </>
             )}
-            <ActionBtn onClick={() => deleteTask(task.id)} title="删除" danger>
-              <Trash2 size={13} />
-            </ActionBtn>
           </div>
         </div>
       </div>
@@ -352,7 +370,7 @@ const ActionBtn = forwardRef<HTMLButtonElement, {
       onClick={onClick}
       title={title}
       style={{
-        width: 28, height: 28, borderRadius: 6,
+        width: 30, height: 30, borderRadius: 7,
         display: "flex", alignItems: "center", justifyContent: "center",
         color: active ? activeColor : "#999",
         background: active ? `${activeColor}15` : "transparent",

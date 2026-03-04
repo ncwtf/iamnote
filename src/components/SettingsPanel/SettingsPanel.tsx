@@ -492,6 +492,15 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
   const [appVersion, setAppVersion] = useState("");
   useEffect(() => { getVersion().then(setAppVersion).catch(() => setAppVersion("0.1.0")); }, []);
 
+  // Esc 关闭设置面板（不在录制快捷键时）
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
   return (
     <div style={{
       position: "absolute", inset: 0, zIndex: 50,

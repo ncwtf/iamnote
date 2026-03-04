@@ -287,7 +287,7 @@ function App() {
       }}
     >
       <TitleBar
-        onSettingsClick={() => setShowSettings(true)}
+        onSettingsClick={() => setShowSettings((v) => !v)}
         groupColor={
           isFavorites ? "#F59E0B" :
           isArchive   ? "#6B7280" :
