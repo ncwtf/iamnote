@@ -1,11 +1,63 @@
-import { Archive, ChevronDown, ChevronRight } from "lucide-react";
+import { Archive, ChevronDown, ChevronRight, Download, FileSpreadsheet } from "lucide-react";
 import { useState, useRef } from "react";
+import * as XLSX from "xlsx";
 import { useArchiveStore } from "../../store/archiveStore";
 import { useTaskStore } from "../../store/taskStore";
 import { useGroupStore } from "../../store/groupStore";
 import { useSettingsStore } from "../../store/settingsStore";
-import { ArchivedTask, toYearMonth } from "../../types";
+import { ArchivedTask, ArchiveMonth, toYearMonth } from "../../types";
 import { HoverPreview } from "../TaskList/FloatDetailPanel";
+
+// ── Excel 导出工具 ───────────────────────────────────────────
+function fmtDate(iso: string | null) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+function tasksToRows(tasks: ArchivedTask[], includeMonth = false) {
+  return tasks.map((t) => {
+    const base: Record<string, string> = {
+      "任务标题": t.title,
+      "分组": t.groupName,
+      "创建时间": fmtDate(t.createdAt),
+      "完成时间": fmtDate(t.completedAt),
+      "归档时间": fmtDate(t.archivedAt),
+      "详情备注": t.detail ?? "",
+    };
+    if (includeMonth) base["归档月份"] = t.archivedAt ? toYearMonth(new Date(t.archivedAt)) : "";
+    return base;
+  });
+}
+
+function exportToExcel(months: ArchiveMonth[], filename: string, multiSheet: boolean) {
+  const wb = XLSX.utils.book_new();
+  if (multiSheet) {
+    months.forEach((m) => {
+      const ws = XLSX.utils.json_to_sheet(tasksToRows(m.tasks));
+      setColWidths(ws);
+      XLSX.utils.book_append_sheet(wb, ws, m.label.replace(/[\\/*?[\]:]/g, "_").slice(0, 31));
+    });
+  } else {
+    const allTasks = months.flatMap((m) => m.tasks);
+    const ws = XLSX.utils.json_to_sheet(tasksToRows(allTasks, true));
+    setColWidths(ws);
+    XLSX.utils.book_append_sheet(wb, ws, "全部归档");
+  }
+  XLSX.writeFile(wb, filename);
+}
+
+function setColWidths(ws: XLSX.WorkSheet) {
+  ws["!cols"] = [
+    { wch: 36 }, // 任务标题
+    { wch: 14 }, // 分组
+    { wch: 18 }, // 创建时间
+    { wch: 18 }, // 完成时间
+    { wch: 18 }, // 归档时间
+    { wch: 50 }, // 详情备注
+    { wch: 10 }, // 归档月份（可选）
+  ];
+}
 
 // ── 已归档任务行（只读） ──────────────────────────────────────
 function ArchivedTaskRow({ task }: { task: ArchivedTask }) {
@@ -171,6 +223,52 @@ export function ArchiveView({ onArchiveNow, archiving }: ArchiveViewProps) {
       }}>
         <Archive size={16} color="#6B7280" />
         <span style={{ fontSize: 16, fontWeight: 700, color: "#1c1c1e", flex: 1 }}>归档</span>
+
+        {/* 导出按钮组（有归档记录时显示） */}
+        {archives.length > 0 && (
+          <div style={{ display: "flex", gap: 6 }}>
+            {/* 导出当前月 */}
+            {currentArchive && currentArchive.tasks.length > 0 && (
+              <button
+                onClick={() => {
+                  exportToExcel([currentArchive], `归档_${currentArchive.label}.xlsx`, false);
+                }}
+                title={`导出 ${currentArchive.label} 为 Excel`}
+                style={{
+                  display: "flex", alignItems: "center", gap: 5,
+                  padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600,
+                  color: "#10B981", backgroundColor: "#ECFDF5",
+                  border: "1.5px solid #A7F3D0",
+                  transition: "all 0.15s",
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = "#D1FAE5"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = "#ECFDF5"; }}
+              >
+                <FileSpreadsheet size={13} />
+                导出本月
+              </button>
+            )}
+            {/* 导出全部（分 sheet） */}
+            <button
+              onClick={() => {
+                exportToExcel(archives, "归档_全部.xlsx", true);
+              }}
+              title="将所有归档月份导出为多工作表 Excel"
+              style={{
+                display: "flex", alignItems: "center", gap: 5,
+                padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600,
+                color: "#3B82F6", backgroundColor: "#EFF6FF",
+                border: "1.5px solid #BFDBFE",
+                transition: "all 0.15s",
+              }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = "#DBEAFE"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = "#EFF6FF"; }}
+            >
+              <Download size={13} />
+              导出全部
+            </button>
+          </div>
+        )}
 
         {doneTasks.length > 0 && (
           <button
