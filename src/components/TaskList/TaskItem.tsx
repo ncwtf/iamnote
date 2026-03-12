@@ -87,18 +87,32 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge }: Tas
   // 悬停预览气泡
   const taskRef = useRef<HTMLDivElement>(null);
   const [previewRect, setPreviewRect] = useState<DOMRect | null>(null);
-  const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showPreview = () => {
     if (!task.detail?.trim()) return;
-    previewTimerRef.current = setTimeout(() => {
+    clearTimeout(dismissTimerRef.current!);
+    showTimerRef.current = setTimeout(() => {
       const rect = taskRef.current?.getBoundingClientRect();
       if (rect) setPreviewRect(rect);
-    }, 350);
+    }, 300);
+  };
+
+  /** 鼠标离开任务行时，给 150ms 缓冲让鼠标移入气泡 */
+  const scheduleHide = () => {
+    clearTimeout(showTimerRef.current!);
+    dismissTimerRef.current = setTimeout(() => setPreviewRect(null), 150);
+  };
+
+  /** 鼠标移入气泡时取消关闭 */
+  const cancelHide = () => {
+    clearTimeout(dismissTimerRef.current!);
   };
 
   const hidePreview = () => {
-    clearTimeout(previewTimerRef.current!);
+    clearTimeout(showTimerRef.current!);
+    clearTimeout(dismissTimerRef.current!);
     setPreviewRect(null);
   };
 
@@ -136,7 +150,7 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge }: Tas
       <div
         ref={taskRef}
         onMouseEnter={() => { setHovered(true); showPreview(); }}
-        onMouseLeave={() => { setHovered(false); hidePreview(); }}
+        onMouseLeave={() => { setHovered(false); scheduleHide(); }}
         style={{
           borderBottom: "1px solid rgba(0,0,0,0.05)",
           background: hovered ? "rgba(0,0,0,0.018)" : "transparent",
@@ -325,6 +339,8 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge }: Tas
           accentColor={accentColor}
           anchorRect={previewRect}
           content={task.detail}
+          onKeepOpen={cancelHide}
+          onDismiss={hidePreview}
         />
       )}
 

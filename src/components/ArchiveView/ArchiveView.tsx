@@ -12,19 +12,27 @@ function ArchivedTaskRow({ task }: { task: ArchivedTask }) {
   const [expanded, setExpanded] = useState(false);
   const rowRef = useRef<HTMLDivElement>(null);
   const [previewRect, setPreviewRect] = useState<DOMRect | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const hasDetail = !!task.detail?.trim();
 
   const showPreview = () => {
     if (!hasDetail) return;
-    timerRef.current = setTimeout(() => {
+    clearTimeout(dismissTimerRef.current!);
+    showTimerRef.current = setTimeout(() => {
       const rect = rowRef.current?.getBoundingClientRect();
       if (rect) setPreviewRect(rect);
-    }, 350);
+    }, 300);
   };
+  const scheduleHide = () => {
+    clearTimeout(showTimerRef.current!);
+    dismissTimerRef.current = setTimeout(() => setPreviewRect(null), 150);
+  };
+  const cancelHide = () => clearTimeout(dismissTimerRef.current!);
   const hidePreview = () => {
-    clearTimeout(timerRef.current!);
+    clearTimeout(showTimerRef.current!);
+    clearTimeout(dismissTimerRef.current!);
     setPreviewRect(null);
   };
 
@@ -50,7 +58,7 @@ function ArchivedTaskRow({ task }: { task: ArchivedTask }) {
         }}
         onMouseLeave={(e) => {
           (e.currentTarget as HTMLElement).style.background = "transparent";
-          hidePreview();
+          scheduleHide();
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -113,6 +121,8 @@ function ArchivedTaskRow({ task }: { task: ArchivedTask }) {
           accentColor={task.groupColor}
           anchorRect={previewRect}
           content={task.detail}
+          onKeepOpen={cancelHide}
+          onDismiss={hidePreview}
         />
       )}
     </>

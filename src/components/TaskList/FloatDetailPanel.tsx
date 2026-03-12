@@ -4,6 +4,8 @@ import { X, GripHorizontal } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
+import rehypeHighlight from "rehype-highlight";
+import "highlight.js/styles/github.css";
 import { Task } from "../../types";
 import { useTaskStore } from "../../store/taskStore";
 
@@ -143,7 +145,7 @@ export function FloatDetailPanel({ task, accentColor, anchorRect, onClose }: Flo
           <div style={{ padding: "3px 10px", fontSize: 10, fontWeight: 700, color: `${accentColor}90`, letterSpacing: 0.8, background: `${accentColor}08`, borderBottom: `1px solid ${accentColor}12`, flexShrink: 0 }}>预览</div>
           <div className="md-content" style={{ flex: 1, padding: "10px 12px", fontSize: 13, lineHeight: 1.75, color: "#374151", overflowY: "auto" }}>
             {draft.trim()
-              ? <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>{draft}</ReactMarkdown>
+              ? <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} rehypePlugins={[rehypeHighlight]}>{draft}</ReactMarkdown>
               : <span style={{ color: "#D1D5DB", fontStyle: "italic" }}>输入 Markdown 内容…</span>
             }
           </div>
@@ -161,37 +163,107 @@ export function FloatDetailPanel({ task, accentColor, anchorRect, onClose }: Flo
 // ─────────────────────────────────────────────────────────
 // 2. 悬停触发的只读预览气泡
 // ─────────────────────────────────────────────────────────
+const PREVIEW_MAX_H = 340;
+const PREVIEW_W     = 360;
+
 interface HoverPreviewProps {
   accentColor: string;
   anchorRect: DOMRect;
   content: string;
+  /** 鼠标移入气泡时调用（取消关闭计时器） */
+  onKeepOpen: () => void;
+  /** 鼠标移出气泡时调用（触发关闭） */
+  onDismiss: () => void;
 }
 
-export function HoverPreview({ accentColor, anchorRect, content }: HoverPreviewProps) {
-  const previewW = Math.max(anchorRect.width - 10, 220);
-  const left = anchorRect.left + 32;
-  const top = anchorRect.bottom + 4;
+export function HoverPreview({
+  accentColor, anchorRect, content, onKeepOpen, onDismiss,
+}: HoverPreviewProps) {
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ left: number; top: number; above: boolean } | null>(null);
+
+  // 计算位置：优先显示在下方，空间不足时翻转到上方
+  useEffect(() => {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    let left = anchorRect.left + 32;
+    if (left + PREVIEW_W > vw - 8) left = vw - PREVIEW_W - 8;
+    if (left < 8) left = 8;
+
+    const spaceBelow = vh - anchorRect.bottom - 8;
+    const spaceAbove = anchorRect.top - 8;
+    const above = spaceBelow < 160 && spaceAbove > spaceBelow;
+
+    const top = above
+      ? anchorRect.top - Math.min(PREVIEW_MAX_H, spaceAbove) - 4
+      : anchorRect.bottom + 4;
+
+    setPos({ left, top, above });
+  }, [anchorRect]);
+
+  if (!pos) return null;
+
+  const maxH = pos.above
+    ? Math.min(PREVIEW_MAX_H, anchorRect.top - 12)
+    : Math.min(PREVIEW_MAX_H, window.innerHeight - pos.top - 8);
 
   return createPortal(
-    <div style={{
-      position: "fixed", left, top, width: previewW,
-      zIndex: 8000, pointerEvents: "none",
-      borderRadius: 8,
-      border: `1px solid ${accentColor}22`,
-      boxShadow: `0 4px 14px rgba(0,0,0,0.09), 0 1px 3px rgba(0,0,0,0.05)`,
-      background: "#fff",
-      padding: "7px 10px",
-      maxHeight: 180, overflow: "hidden",
-    }}>
-      <div className="md-content" style={{ fontSize: 12.5, lineHeight: 1.7, color: "#4B5563" }}>
-        <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>{content}</ReactMarkdown>
-      </div>
-      {/* 底部渐隐遮罩（内容超长时） */}
+    <div
+      onMouseEnter={onKeepOpen}
+      onMouseLeave={onDismiss}
+      style={{
+        position: "fixed",
+        left: pos.left,
+        top: pos.top,
+        width: PREVIEW_W,
+        maxHeight: maxH,
+        zIndex: 8500,
+        borderRadius: 10,
+        border: `1px solid ${accentColor}30`,
+        boxShadow: "0 8px 28px rgba(0,0,0,0.13), 0 2px 6px rgba(0,0,0,0.07)",
+        background: "#fff",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        animation: "hoverPreviewIn 0.15s ease",
+      }}
+    >
+      {/* 标题条 */}
       <div style={{
-        position: "absolute", bottom: 0, left: 0, right: 0, height: 28,
-        background: "linear-gradient(transparent, #fff)",
-        borderRadius: "0 0 8px 8px",
-      }} />
+        padding: "5px 12px 4px",
+        background: `${accentColor}0d`,
+        borderBottom: `1px solid ${accentColor}18`,
+        fontSize: 10,
+        fontWeight: 700,
+        color: `${accentColor}bb`,
+        letterSpacing: 0.5,
+        flexShrink: 0,
+        userSelect: "none",
+      }}>
+        PREVIEW
+      </div>
+
+      {/* 内容区：可滚动 */}
+      <div
+        ref={contentRef}
+        className="md-content github-md"
+        style={{
+          flex: 1,
+          overflowY: "auto",
+          padding: "10px 14px 12px",
+          fontSize: 13,
+          lineHeight: 1.7,
+          color: "#24292f",
+        }}
+      >
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm, remarkBreaks]}
+          rehypePlugins={[rehypeHighlight]}
+        >
+          {content}
+        </ReactMarkdown>
+      </div>
     </div>,
     document.body
   );
