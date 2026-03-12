@@ -14,6 +14,7 @@ import { FAVORITES_GROUP_ID, ARCHIVE_GROUP_ID, OVERVIEW_GROUP_ID, toYearMonth } 
 import { buildShortcutString } from "./lib/shortcut";
 import { writeSyncFile, resolveOnStartup } from "./lib/sync";
 import { invoke } from "@tauri-apps/api/core";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   isPermissionGranted,
   requestPermission,
@@ -116,6 +117,23 @@ function App() {
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // ← 空依赖，interval 永不重置
+
+  // 全局链接拦截：所有外部链接在系统默认浏览器中打开，不在 WebView 内跳转
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      const target = (e.target as HTMLElement).closest("a");
+      if (!target) return;
+      const href = target.getAttribute("href");
+      if (!href) return;
+      // 只拦截 http/https 外部链接
+      if (href.startsWith("http://") || href.startsWith("https://")) {
+        e.preventDefault();
+        openUrl(href).catch(() => {});
+      }
+    };
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
+  }, []);
 
   // F12 隐藏快捷键：打开 DevTools 控制台
   useEffect(() => {
