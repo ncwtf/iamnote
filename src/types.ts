@@ -14,7 +14,7 @@ export interface Task {
   groupId: string;
   title: string;
   detail: string;
-  status: "todo" | "in-progress" | "done";
+  status: "todo" | "in-progress" | "done" | "cancelled";
   pinned: boolean;
   favorited: boolean;
   order: number;
@@ -75,6 +75,14 @@ export const STATUS_LABELS: Record<Task["status"], string> = {
   todo: "待办",
   "in-progress": "进行中",
   done: "完成",
+  cancelled: "已取消",
+};
+
+export const STATUS_COLORS: Record<Task["status"], string> = {
+  todo: "#D1D5DB",
+  "in-progress": "#F59E0B",
+  done: "#10B981",
+  cancelled: "#9CA3AF",
 };
 
 export const STATUS_CYCLE: Task["status"][] = ["todo", "in-progress", "done"];

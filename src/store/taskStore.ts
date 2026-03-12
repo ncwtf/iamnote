@@ -72,6 +72,11 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   cycleStatus: (id) => {
     const task = get().tasks.find((t) => t.id === id);
     if (!task) return;
+    // cancelled 左键直接回到 todo；否则在3态中循环
+    if (task.status === "cancelled") {
+      get().updateTask(id, { status: "todo" });
+      return;
+    }
     const currentIndex = STATUS_CYCLE.indexOf(task.status);
     const nextStatus = STATUS_CYCLE[(currentIndex + 1) % STATUS_CYCLE.length];
 
