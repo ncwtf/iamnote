@@ -59,13 +59,13 @@ jobs:
         run: npm ci
 
       - name: Build macOS (Apple Silicon)
-        run: npm run tauri build -- --target aarch64-apple-darwin
+        run: npm run tauri build -- --target aarch64-apple-darwin --bundles dmg
         env:
           TAURI_SIGNING_PRIVATE_KEY: ''
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
 
       - name: Build macOS (Intel)
-        run: npm run tauri build -- --target x86_64-apple-darwin
+        run: npm run tauri build -- --target x86_64-apple-darwin --bundles dmg
         env:
           TAURI_SIGNING_PRIVATE_KEY: ''
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
