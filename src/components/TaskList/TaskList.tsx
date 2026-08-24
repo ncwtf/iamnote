@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Plus, ChevronDown, ChevronRight } from "lucide-react";
+import { Plus, ChevronDown, ChevronRight, Search, SlidersHorizontal } from "lucide-react";
 import {
   DndContext,
   closestCenter,
@@ -20,18 +20,26 @@ import { CSS } from "@dnd-kit/utilities";
 import { useTaskStore } from "../../store/taskStore";
 import { TaskItem } from "./TaskItem";
 import { Group, Task, isEnded } from "../../types";
+import { ui } from "../../theme";
+import { CircleIconBtn, PageHeader, PrimaryBtn } from "../chrome";
 
 interface TaskListProps {
   group: Group;
   addTriggerRef?: React.RefObject<(() => void) | null>;
 }
 
+type StatusFilter = "all" | "todo" | "in-progress";
+
 export function TaskList({ group, addTriggerRef }: TaskListProps) {
   const { getGroupTasks, addTask, reorderTasks } = useTaskStore();
   const [isAdding, setIsAdding] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [doneExpanded, setDoneExpanded] = useState(true);
+  const [showSearch, setShowSearch] = useState(false);
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const inputRef = useRef<HTMLInputElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const allTasks = getGroupTasks(group.id);
 
@@ -48,6 +56,7 @@ export function TaskList({ group, addTriggerRef }: TaskListProps) {
   }, [addTriggerRef]);
 
   useEffect(() => { if (isAdding) inputRef.current?.focus(); }, [isAdding]);
+  useEffect(() => { if (showSearch) searchRef.current?.focus(); }, [showSearch]);
 
   const handleAdd = () => {
     const title = newTitle.trim();
@@ -60,68 +69,93 @@ export function TaskList({ group, addTriggerRef }: TaskListProps) {
     }
   };
 
-  const pinnedTasks = allTasks.filter((t) => t.pinned && !isEnded(t.status));
-  const activeTasks = allTasks.filter((t) => !t.pinned && !isEnded(t.status));
+  const match = (t: Task) => {
+    if (query.trim() && !t.title.toLowerCase().includes(query.trim().toLowerCase())) return false;
+    if (statusFilter !== "all" && t.status !== statusFilter) return false;
+    return true;
+  };
+
+  const pinnedTasks = allTasks.filter((t) => t.pinned && !isEnded(t.status) && match(t));
+  const activeTasks = allTasks.filter((t) => !t.pinned && !isEnded(t.status) && match(t));
   const endedTasks = allTasks
-    .filter((t) => isEnded(t.status))
+    .filter((t) => isEnded(t.status) && match(t))
     .slice()
     .sort((a, b) => (b.completedAt ?? b.createdAt).localeCompare(a.completedAt ?? a.createdAt));
-  const activeCount = pinnedTasks.length + activeTasks.length;
+  const activeCount = allTasks.filter((t) => !isEnded(t.status)).length;
   const cancelledCount = endedTasks.filter((t) => t.status === "cancelled").length;
 
-  return (
-    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: "#FAFAF8" }}>
-      <div
-        style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "14px 18px",
-          borderBottom: `2px solid ${group.color}30`,
-          background: "#fff",
-          flexShrink: 0,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: group.color, flexShrink: 0 }} />
-          <span style={{ fontSize: 16, fontWeight: 700, color: "#1c1c1e" }}>{group.name}</span>
-          {activeCount > 0 && (
-            <span style={{
-              fontSize: 12, fontWeight: 500, color: "#999",
-              background: "#F3F4F6", borderRadius: 10, padding: "1px 8px",
-            }}>
-              {activeCount} 项
-            </span>
-          )}
-        </div>
-        <button
-          onClick={() => { setIsAdding(true); setNewTitle(""); }}
-          style={{
-            display: "flex", alignItems: "center", gap: 5,
-            padding: "6px 12px", borderRadius: 8, fontSize: 13, fontWeight: 500,
-            color: "#fff",
-            backgroundColor: group.color,
-            boxShadow: `0 2px 6px ${group.color}50`,
-            transition: "opacity 0.15s",
-          }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.opacity = "0.85"; }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.opacity = "1"; }}
-        >
-          <Plus size={14} />
-          新建任务
-        </button>
-      </div>
+  const startAdd = () => { setIsAdding(true); setNewTitle(""); };
 
-      <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column" }}>
+  const cycleFilter = () => {
+    setStatusFilter((prev) => (
+      prev === "all" ? "todo" : prev === "todo" ? "in-progress" : "all"
+    ));
+  };
+
+  return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: ui.canvas }}>
+      <PageHeader
+        title={group.name}
+        count={activeCount}
+        actions={
+          <>
+            <CircleIconBtn
+              title="搜索"
+              active={showSearch}
+              onClick={() => {
+                setShowSearch((v) => {
+                  if (v) setQuery("");
+                  return !v;
+                });
+              }}
+            >
+              <Search size={15} />
+            </CircleIconBtn>
+            <CircleIconBtn
+              title={statusFilter === "all" ? "筛选：全部" : statusFilter === "todo" ? "筛选：待办" : "筛选：进行中"}
+              active={statusFilter !== "all"}
+              onClick={cycleFilter}
+            >
+              <SlidersHorizontal size={15} />
+            </CircleIconBtn>
+            <PrimaryBtn onClick={startAdd}>
+              <Plus size={14} />
+              新建任务
+            </PrimaryBtn>
+          </>
+        }
+      />
+
+      {showSearch && (
+        <div style={{ padding: "0 22px 10px" }}>
+          <input
+            ref={searchRef}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="搜索任务名称…"
+            style={{
+              width: "100%", fontSize: 13, padding: "8px 12px",
+              border: `1px solid ${ui.lineStrong}`, borderRadius: 12,
+              background: ui.card, color: ui.ink, boxShadow: ui.cardShadow,
+            }}
+          />
+        </div>
+      )}
+
+      <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", padding: "4px 16px 16px" }}>
         {isAdding && (
           <div
             style={{
               display: "flex", alignItems: "center", gap: 10,
-              padding: "10px 14px",
-              background: "#fff",
-              borderBottom: "1px solid rgba(0,0,0,0.06)",
-              borderLeft: `3px solid ${group.color}`,
+              padding: "14px 16px",
+              marginBottom: 10,
+              background: ui.card,
+              borderRadius: 16,
+              border: `1px solid ${tintBlue(0.28)}`,
+              boxShadow: ui.cardShadow,
             }}
           >
-            <div style={{ width: 20, height: 20, borderRadius: "50%", border: "2px dashed #ccc", flexShrink: 0 }} />
+            <div style={{ width: 20, height: 20, borderRadius: "50%", border: "2px dashed #D1D5DB", flexShrink: 0 }} />
             <input
               ref={inputRef}
               value={newTitle}
@@ -132,22 +166,23 @@ export function TaskList({ group, addTriggerRef }: TaskListProps) {
                 if (e.key === "Escape") setIsAdding(false);
               }}
               placeholder="输入任务名称，Enter 确认..."
-              style={{ flex: 1, fontSize: 14, background: "transparent", color: "#1c1c1e" }}
+              style={{ flex: 1, fontSize: 14, background: "transparent", color: ui.ink }}
             />
           </div>
         )}
 
         {allTasks.length === 0 && !isAdding && (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, padding: 40, textAlign: "center" }}>
-            <div style={{ width: 48, height: 48, borderRadius: "50%", backgroundColor: `${group.color}20`, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 16 }}>
-              <div style={{ width: 20, height: 20, borderRadius: "50%", backgroundColor: group.color, opacity: 0.4 }} />
+            <div style={{
+              width: 52, height: 52, borderRadius: 16,
+              background: tintBlue(0.10),
+              display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 16,
+            }}>
+              <Plus size={22} color={ui.accent} />
             </div>
-            <p style={{ fontSize: 15, fontWeight: 600, color: "#999", marginBottom: 6 }}>该分组还没有任务</p>
-            <p style={{ fontSize: 13, color: "#bbb", marginBottom: 16 }}>点击右上角「新建任务」开始添加</p>
-            <button
-              onClick={() => { setIsAdding(true); setNewTitle(""); }}
-              style={{ fontSize: 13, color: group.color, fontWeight: 500 }}
-            >
+            <p style={{ fontSize: 15, fontWeight: 600, color: ui.inkSoft, marginBottom: 6 }}>还没有便签</p>
+            <p style={{ fontSize: 13, color: ui.faint, marginBottom: 16 }}>点右上角「新建任务」，或按快捷键添加</p>
+            <button onClick={startAdd} style={{ fontSize: 13, color: ui.accent, fontWeight: 600 }}>
               + 新建第一个任务
             </button>
           </div>
@@ -155,7 +190,7 @@ export function TaskList({ group, addTriggerRef }: TaskListProps) {
 
         {pinnedTasks.length > 0 && (
           <div>
-            <SectionLabel label="📌 置顶" />
+            <SectionLabel label="置顶" />
             <SortableTaskSection
               tasks={pinnedTasks}
               accentColor={group.color}
@@ -178,14 +213,17 @@ export function TaskList({ group, addTriggerRef }: TaskListProps) {
         <div style={{ flex: 1 }} />
 
         {endedTasks.length > 0 && (
-          <div style={{ borderTop: "1px solid rgba(0,0,0,0.06)", background: "#fff", flexShrink: 0 }}>
+          <div style={{
+            marginTop: 8, borderRadius: 16, overflow: "hidden",
+            background: "rgba(255,255,255,0.62)", border: `1px solid ${ui.line}`, flexShrink: 0,
+          }}>
             <button
               onClick={() => setDoneExpanded(!doneExpanded)}
               style={{
                 width: "100%", display: "flex", alignItems: "center", gap: 8,
                 padding: "10px 14px",
-                fontSize: 12, fontWeight: 600, color: "#999",
-                textTransform: "uppercase", letterSpacing: "0.06em",
+                fontSize: 12, fontWeight: 600, color: ui.muted,
+                letterSpacing: "-0.01em",
                 transition: "background 0.12s",
               }}
               onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.025)"; }}
@@ -198,14 +236,14 @@ export function TaskList({ group, addTriggerRef }: TaskListProps) {
               <span style={{ flex: 1, textAlign: "left" }}>
                 {cancelledCount > 0 ? "已结束" : "已完成"}
               </span>
-              <span style={{ background: "#F3F4F6", borderRadius: 8, padding: "1px 7px", fontSize: 11, fontWeight: 600, color: "#aaa", marginRight: 4 }}>
+              <span style={{ background: "rgba(23,23,23,0.06)", borderRadius: 7, padding: "1px 7px", fontSize: 11, fontWeight: 500, color: ui.muted, marginRight: 4 }}>
                 {endedTasks.length}
               </span>
               {doneExpanded ? <ChevronDown size={13} color="#bbb" /> : <ChevronRight size={13} color="#bbb" />}
             </button>
 
             {doneExpanded && (
-              <div style={{ maxHeight: 220, overflowY: "auto", borderTop: "1px solid rgba(0,0,0,0.04)" }}>
+              <div style={{ maxHeight: 220, overflowY: "auto", borderTop: `1px solid ${ui.line}` }}>
                 {endedTasks.map((task) => (
                   <TaskItem
                     key={task.id}
@@ -221,6 +259,10 @@ export function TaskList({ group, addTriggerRef }: TaskListProps) {
       </div>
     </div>
   );
+}
+
+function tintBlue(alpha: number) {
+  return `rgba(37, 99, 235, ${alpha})`;
 }
 
 function SortableTaskSection({
@@ -281,7 +323,7 @@ function SortableTaskItem({ task, accentColor }: { task: Task; accentColor: stri
 
 function SectionLabel({ label }: { label: string }) {
   return (
-    <div style={{ padding: "8px 14px 4px", fontSize: 11, fontWeight: 700, color: "#bbb", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+    <div style={{ padding: "4px 6px 8px", fontSize: 12, fontWeight: 600, color: ui.muted }}>
       {label}
     </div>
   );

@@ -7,6 +7,7 @@ import { useTaskStore } from "../../store/taskStore";
 import { buildShortcutString } from "../../lib/shortcut";
 import { exportBackup, importBackup } from "../../lib/importExport";
 import { pickSyncFolder, writeSyncFile } from "../../lib/sync";
+import { ui } from "../../theme";
 
 interface SettingsPanelProps {
   onClose: () => void;
@@ -145,14 +146,14 @@ function ToggleRow({ icon, label, desc, checked, onChange, color }: {
       <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
         <div style={{
           width: 36, height: 36, borderRadius: 10,
-          background: "#F3F4F6", display: "flex", alignItems: "center",
-          justifyContent: "center", color: "#555", flexShrink: 0, marginTop: 1,
+          background: ui.paperDeep, display: "flex", alignItems: "center",
+          justifyContent: "center", color: ui.inkSoft, flexShrink: 0, marginTop: 1,
         }}>
           {icon}
         </div>
         <div>
-          <p style={{ fontSize: 14, fontWeight: 600, color: "#1c1c1e" }}>{label}</p>
-          <p style={{ fontSize: 12, color: "#9CA3AF", marginTop: 2 }}>{desc}</p>
+          <p style={{ fontSize: 14, fontWeight: 600, color: ui.ink }}>{label}</p>
+          <p style={{ fontSize: 12, color: ui.muted, marginTop: 2 }}>{desc}</p>
         </div>
       </div>
       <Toggle checked={checked} onChange={onChange} color={color} />
@@ -177,14 +178,14 @@ function ShortcutRow({ icon, label, desc, value, onChange }: {
       <div style={{ display: "flex", alignItems: "flex-start", gap: 12, flex: 1, minWidth: 0 }}>
         <div style={{
           width: 36, height: 36, borderRadius: 10,
-          background: "#F3F4F6", display: "flex", alignItems: "center",
-          justifyContent: "center", color: "#555", flexShrink: 0, marginTop: 1,
+          background: ui.paperDeep, display: "flex", alignItems: "center",
+          justifyContent: "center", color: ui.inkSoft, flexShrink: 0, marginTop: 1,
         }}>
           {icon}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ fontSize: 14, fontWeight: 600, color: "#1c1c1e" }}>{label}</p>
-          <p style={{ fontSize: 12, color: "#9CA3AF", marginTop: 2 }}>{desc}</p>
+          <p style={{ fontSize: 14, fontWeight: 600, color: ui.ink }}>{label}</p>
+          <p style={{ fontSize: 12, color: ui.muted, marginTop: 2 }}>{desc}</p>
         </div>
       </div>
       <ShortcutRecorder value={value} onChange={onChange} />
@@ -196,8 +197,8 @@ function ShortcutRow({ icon, label, desc, value, onChange }: {
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
     <p style={{
-      fontSize: 11, fontWeight: 700, color: "#9CA3AF",
-      textTransform: "uppercase", letterSpacing: "0.08em",
+      fontSize: 12, fontWeight: 600, color: ui.muted,
+      letterSpacing: "-0.01em",
       padding: "16px 0 4px",
     }}>
       {children}
@@ -504,20 +505,19 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
   return (
     <div style={{
       position: "absolute", inset: 0, zIndex: 50,
-      background: "#FAFAF8",
-      borderRadius: 12,
+      background: ui.canvas,
+      borderRadius: 0,
       display: "flex", flexDirection: "column",
     }}>
       {/* 头部 */}
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "16px 20px",
-        borderBottom: "1px solid rgba(0,0,0,0.07)",
-        background: "#fff",
-        borderRadius: "12px 12px 0 0",
+        padding: "16px 22px",
+        borderBottom: `1px solid ${ui.line}`,
+        background: ui.canvas,
         flexShrink: 0,
       }}>
-        <span style={{ fontSize: 16, fontWeight: 700, color: "#1c1c1e" }}>设置</span>
+        <span style={{ fontSize: 16, fontWeight: 600, letterSpacing: "-0.02em", color: ui.ink }}>设置</span>
         <button
           onClick={onClose}
           style={{ width: 30, height: 30, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", color: "#999" }}
@@ -589,13 +589,10 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
       </div>
 
       {/* 底部版本 & 作者 */}
-      <div style={{ padding: "14px 20px 18px", textAlign: "center", flexShrink: 0, borderTop: "1px solid rgba(0,0,0,0.05)" }}>
-        <p style={{ fontSize: 13, fontWeight: 600, color: "#6B7280", marginBottom: 4 }}>iamnote v{appVersion}</p>
-        <p style={{ fontSize: 11, color: "#C4C4C4", lineHeight: 1.7 }}>
-          Made with ♥ by <span style={{ color: "#9CA3AF", fontWeight: 500 }}>Hunter</span>
-        </p>
-        <p style={{ fontSize: 11, color: "#D1D5DB", marginTop: 2 }}>
-          I AM NOTE is a simple and powerful task management tool.
+      <div style={{ padding: "14px 20px 18px", textAlign: "center", flexShrink: 0, borderTop: `1px solid ${ui.line}` }}>
+        <p style={{ fontSize: 13, fontWeight: 600, color: ui.inkSoft, marginBottom: 4 }}>iamnote v{appVersion}</p>
+        <p style={{ fontSize: 11, color: ui.faint, lineHeight: 1.7 }}>
+          Made with ♥ by <span style={{ color: ui.muted, fontWeight: 500 }}>Hunter</span>
         </p>
       </div>
     </div>

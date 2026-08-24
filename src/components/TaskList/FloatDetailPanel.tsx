@@ -102,8 +102,8 @@ export function FloatDetailPanel({ task, accentColor, anchorRect, onClose }: Flo
       position: "fixed", left: pos.x, top: pos.y, width: PANEL_W,
       zIndex: 9999, display: "flex", flexDirection: "column",
       borderRadius: 12,
-      boxShadow: "0 12px 40px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.10)",
-      border: `1.5px solid ${accentColor}28`, background: "#fff", overflow: "hidden",
+      boxShadow: "0 12px 40px rgba(42,39,35,0.12), 0 2px 6px rgba(42,39,35,0.06)",
+      border: `1px solid ${accentColor}30`, background: "#FFFCF7", overflow: "hidden",
     }}>
       {/* 标题栏 */}
       <div onMouseDown={onHeaderMouseDown} style={{
@@ -225,8 +225,8 @@ export function HoverPreview({
         zIndex: 8500,
         borderRadius: 10,
         border: `1px solid ${accentColor}30`,
-        boxShadow: "0 8px 28px rgba(0,0,0,0.13), 0 2px 6px rgba(0,0,0,0.07)",
-        background: "#fff",
+        boxShadow: "0 8px 28px rgba(42,39,35,0.10), 0 1px 4px rgba(42,39,35,0.05)",
+        background: "#FFFCF7",
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",

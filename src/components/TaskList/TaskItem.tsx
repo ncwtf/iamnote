@@ -1,7 +1,12 @@
 import { useState, useRef, useEffect, forwardRef } from "react";
 import { createPortal } from "react-dom";
-import { Pin, Trash2, Pencil, Star, FileText, ChevronRight, Settings2, Bell, RotateCcw, CalendarClock, GripVertical } from "lucide-react";
-import { isEnded, Task } from "../../types";
+import {
+  Pin, Trash2, Pencil, Star, FileText, Settings2, Bell, RotateCcw,
+  CalendarClock, GripVertical, MoreHorizontal,
+} from "lucide-react";
+import { isEnded, STATUS_LABELS, Task } from "../../types";
+import { statusTone, ui } from "../../theme";
+import { MetaPill } from "../chrome";
 import { useTaskStore } from "../../store/taskStore";
 import { useStickyPreview } from "../../lib/useStickyPreview";
 import { FloatDetailPanel, HoverPreview } from "./FloatDetailPanel";
@@ -15,14 +20,12 @@ interface TaskItemProps {
   dragHandleProps?: React.HTMLAttributes<HTMLElement>;
 }
 
-// ── 时间格式化 ────────────────────────────────────────────
 function fmt(iso: string | null): string | null {
   if (!iso) return null;
   const d = new Date(iso);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
-// ── 状态选择器气泡（右键呼出） ────────────────────────────────
 function StatusPicker({ anchorRect, current, accentColor, onSelect, onClose }: {
   anchorRect: DOMRect;
   current: Task["status"];
@@ -43,31 +46,30 @@ function StatusPicker({ anchorRect, current, accentColor, onSelect, onClose }: {
   const W = 120, H = 4 * 38 + 28;
   const vw = window.innerWidth, vh = window.innerHeight;
   let left = anchorRect.right + 6;
-  let top  = anchorRect.top - 4;
+  let top = anchorRect.top - 4;
   if (left + W > vw - 6) left = anchorRect.left - W - 6;
-  if (top  + H > vh - 6) top  = vh - H - 6;
+  if (top + H > vh - 6) top = vh - H - 6;
 
   const options: { value: Task["status"]; label: string; dotBg: string; dotBorder: string; inner: React.ReactNode }[] = [
-    { value: "todo",        label: "待办",   dotBg: "#fff",    dotBorder: "#D1D5DB",
-      inner: null },
-    { value: "in-progress", label: "进行中", dotBg: "#FFF8E8", dotBorder: "#F59E0B",
-      inner: <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#F59E0B" }} /> },
-    { value: "done",        label: "完成",   dotBg: accentColor, dotBorder: accentColor,
+    { value: "todo", label: "待办", dotBg: "#fff", dotBorder: "#D1D5DB", inner: null },
+    { value: "in-progress", label: "进行中", dotBg: "#EFF6FF", dotBorder: "#3B82F6",
+      inner: <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#3B82F6" }} /> },
+    { value: "done", label: "完成", dotBg: accentColor, dotBorder: accentColor,
       inner: <svg width="9" height="9" viewBox="0 0 9 9" fill="none"><path d="M1.5 4.5L3.5 6.5L7.5 2.5" stroke="white" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg> },
-    { value: "cancelled",   label: "已取消", dotBg: "#F3F4F6", dotBorder: "#9CA3AF",
+    { value: "cancelled", label: "已取消", dotBg: "#F3F4F6", dotBorder: "#9CA3AF",
       inner: <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 1.5L6.5 6.5M6.5 1.5L1.5 6.5" stroke="#9CA3AF" strokeWidth="1.7" strokeLinecap="round" /></svg> },
   ];
 
   return createPortal(
     <div ref={ref} style={{
       position: "fixed", left, top, width: W, zIndex: 10000,
-      background: "#fff", borderRadius: 10,
-      boxShadow: "0 6px 24px rgba(0,0,0,0.15), 0 1px 4px rgba(0,0,0,0.08)",
-      border: "1.5px solid rgba(0,0,0,0.07)",
+      background: ui.surface, borderRadius: 12,
+      boxShadow: ui.shadowSoft,
+      border: `1px solid ${ui.line}`,
       padding: "5px 0",
       animation: "hoverPreviewIn 0.12s ease",
     }}>
-      <div style={{ padding: "3px 10px 5px", fontSize: 10, fontWeight: 700, color: "#C4C4C4", letterSpacing: 0.5, userSelect: "none" }}>
+      <div style={{ padding: "3px 10px 5px", fontSize: 10, fontWeight: 700, color: ui.faint, letterSpacing: 0.5, userSelect: "none" }}>
         切换状态
       </div>
       {options.map((opt) => {
@@ -81,7 +83,7 @@ function StatusPicker({ anchorRect, current, accentColor, onSelect, onClose }: {
               padding: "6px 10px",
               background: isCur ? `${accentColor}14` : "transparent",
               fontSize: 12, fontWeight: isCur ? 600 : 400,
-              color: isCur ? "#1c1c1e" : "#374151",
+              color: isCur ? ui.ink : "#374151",
             }}
             onMouseEnter={(e) => { if (!isCur) (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.04)"; }}
             onMouseLeave={(e) => { if (!isCur) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
@@ -104,7 +106,6 @@ function StatusPicker({ anchorRect, current, accentColor, onSelect, onClose }: {
   );
 }
 
-// ── 状态圆点（左键循环3态；右键弹出选择器） ───────────────────
 function StatusDot({ status, accentColor, onClick, onContextMenuOpen }: {
   status: Task["status"];
   accentColor: string;
@@ -113,9 +114,9 @@ function StatusDot({ status, accentColor, onClick, onContextMenuOpen }: {
 }) {
   const ref = useRef<HTMLButtonElement>(null);
   const base: React.CSSProperties = {
-    width: 22, height: 22, borderRadius: "50%", flexShrink: 0,
+    width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
     cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-    transition: "transform 0.12s", border: "2px solid", userSelect: "none",
+    transition: "transform 0.12s, border-color 0.12s", border: "1.5px solid", userSelect: "none",
   };
   const openPicker = (e: React.MouseEvent) => {
     e.preventDefault(); e.stopPropagation();
@@ -137,9 +138,9 @@ function StatusDot({ status, accentColor, onClick, onContextMenuOpen }: {
   if (status === "in-progress") return (
     <button ref={ref} onClick={onClick} onContextMenu={openPicker}
       title="左键循环 · 右键选择状态"
-      style={{ ...base, backgroundColor: "#FFF8E8", borderColor: "#F59E0B" }}
+      style={{ ...base, backgroundColor: "#EFF6FF", borderColor: "#3B82F6" }}
       onMouseEnter={scale("scale(1.12)")} onMouseLeave={scale("scale(1)")}>
-      <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#F59E0B" }} />
+      <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#3B82F6" }} />
     </button>
   );
   if (status === "cancelled") return (
@@ -162,12 +163,10 @@ function StatusDot({ status, accentColor, onClick, onContextMenuOpen }: {
   );
 }
 
-// ── 任务项主体 ────────────────────────────────────────────
 export function TaskItem({ task, accentColor, compact = false, groupBadge, dragHandleProps }: TaskItemProps) {
   const { cycleStatus, togglePin, toggleFavorite, deleteTask, updateTask, setTaskStatus } = useTaskStore();
   const [pickerRect, setPickerRect] = useState<DOMRect | null>(null);
 
-  // 标题编辑
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(task.title);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -180,7 +179,6 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge, dragH
     setIsEditing(false);
   };
 
-  // hover（操作按钮显隐）
   const [hovered, setHovered] = useState(false);
 
   const taskRef = useRef<HTMLDivElement>(null);
@@ -188,33 +186,26 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge, dragH
   const { anchorRect: previewRect, scheduleShow, scheduleHide, keepOpen, hide: hidePreview } =
     useStickyPreview(hasDetail);
 
-  // 点击触发的编辑浮窗
   const [editAnchor, setEditAnchor] = useState<DOMRect | null>(null);
   const detailBtnRef = useRef<HTMLButtonElement>(null);
-  const chevronBtnRef = useRef<HTMLButtonElement>(null);
 
-  const openEdit = (ref: React.RefObject<HTMLButtonElement | null>) => {
+  const openEdit = () => {
     hidePreview();
-    const rect = ref.current?.getBoundingClientRect();
+    const rect = detailBtnRef.current?.getBoundingClientRect();
     if (rect) setEditAnchor(rect);
   };
 
-  // 任务选项浮窗
   const [optionsAnchor, setOptionsAnchor] = useState<DOMRect | null>(null);
-  const optionsBtnRef = useRef<HTMLButtonElement>(null);
-
-  const openOptions = () => {
-    const rect = optionsBtnRef.current?.getBoundingClientRect();
-    if (rect) setOptionsAnchor(rect);
-  };
+  const [moreRect, setMoreRect] = useState<DOMRect | null>(null);
+  const moreBtnRef = useRef<HTMLButtonElement>(null);
 
   const ended = isEnded(task.status);
-  const py = compact ? 6 : 10;
+  const py = compact ? 7 : 12;
 
-  // meta 指示器
   const hasRecurring = task.recurringEnabled;
-  const hasPeriodic  = task.periodicEnabled;
-  const hasReminder  = !!task.reminderAt && !task.reminderFired;
+  const hasPeriodic = task.periodicEnabled;
+  const hasReminder = !!task.reminderAt && !task.reminderFired;
+  const tone = statusTone[task.status];
 
   return (
     <>
@@ -223,9 +214,15 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge, dragH
         onMouseEnter={() => { setHovered(true); scheduleShow(taskRef.current); }}
         onMouseLeave={() => { setHovered(false); scheduleHide(); }}
         style={{
-          borderBottom: "1px solid rgba(0,0,0,0.05)",
-          background: hovered ? "rgba(0,0,0,0.018)" : "transparent",
-          transition: "background 0.12s",
+          borderBottom: compact ? `1px solid ${ui.line}` : "none",
+          background: compact
+            ? (hovered ? "rgba(23,23,23,0.03)" : "transparent")
+            : ui.card,
+          borderRadius: compact ? 0 : 16,
+          boxShadow: compact ? "none" : (hovered ? ui.cardHover : ui.cardShadow),
+          transform: !compact && hovered ? "translateY(-1px)" : "none",
+          marginBottom: compact ? 0 : 10,
+          transition: "background 0.15s, box-shadow 0.15s, transform 0.15s",
         }}
       >
         <div style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: `${py}px 14px` }}>
@@ -242,14 +239,14 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge, dragH
                 width: 16, height: 22, flexShrink: 0, paddingTop: 2,
                 display: "flex", alignItems: "center", justifyContent: "center",
                 color: "#C4C4C4", cursor: "grab", touchAction: "none",
-                opacity: hovered ? 1 : 0,
+                opacity: hovered ? 1 : 0.35,
                 transition: "opacity 0.12s",
               }}
             >
               <GripVertical size={14} />
             </button>
           )}
-          {/* 状态点 */}
+
           <div style={{ paddingTop: 2, flexShrink: 0 }}>
             <StatusDot
               status={task.status}
@@ -259,33 +256,8 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge, dragH
             />
           </div>
 
-          {/* 内容区 */}
           <div style={{ flex: 1, minWidth: 0 }}>
-            {/* 标题行 */}
             <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
-              {/* ▶ 指示：有备注时着色，始终占位 */}
-              {!compact && (
-                <button
-                  ref={chevronBtnRef}
-                  onClick={() => openEdit(chevronBtnRef)}
-                  title={hasDetail ? "查看/编辑备注" : "添加备注"}
-                  tabIndex={-1}
-                  style={{
-                    flexShrink: 0, width: 14, height: 14,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    color: hasDetail ? `${accentColor}70` : "transparent",
-                    cursor: hasDetail ? "pointer" : "default",
-                    borderRadius: 3, transition: "color 0.15s, background 0.12s",
-                    pointerEvents: hasDetail ? "auto" : "none",
-                  }}
-                  onMouseEnter={(e) => { if (hasDetail) (e.currentTarget as HTMLElement).style.background = `${accentColor}15`; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
-                >
-                  <ChevronRight size={12} />
-                </button>
-              )}
-
-              {/* 标题 */}
               {isEditing ? (
                 <input
                   ref={inputRef}
@@ -296,7 +268,7 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge, dragH
                     if (e.key === "Enter") handleEditSave();
                     if (e.key === "Escape") { setEditTitle(task.title); setIsEditing(false); }
                   }}
-                  style={{ flex: 1, minWidth: 0, fontSize: 14, background: "transparent", borderBottom: "1.5px solid #ccc", color: "#1c1c1e", paddingBottom: 1 }}
+                  style={{ flex: 1, minWidth: 0, fontSize: 14.5, background: "transparent", borderBottom: `1.5px solid ${ui.faint}`, color: ui.ink, paddingBottom: 1 }}
                 />
               ) : (
                 <span
@@ -304,10 +276,10 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge, dragH
                   title="点击编辑标题"
                   style={{
                     flex: 1, minWidth: 0, display: "block",
-                    fontSize: 14, lineHeight: 1.4,
-                    color: ended ? "#B0B0B0" : "#1c1c1e",
+                    fontSize: 14.5, lineHeight: 1.45, letterSpacing: "-0.015em", fontWeight: 600,
+                    color: ended ? ui.faint : ui.ink,
                     textDecoration: ended ? "line-through" : "none",
-                    textDecorationColor: "#C0C0C0",
+                    textDecorationColor: ui.faint,
                     cursor: "text",
                     overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                   }}
@@ -317,120 +289,91 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge, dragH
               )}
             </div>
 
-            {/* 标签行（含 meta 指示器） */}
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: compact ? 2 : 4, paddingLeft: compact ? 0 : 17 }}>
-              {groupBadge && (
-                <span style={{ fontSize: 11, fontWeight: 600, color: groupBadge.color, background: `${groupBadge.color}18`, borderRadius: 4, padding: "1px 6px" }}>
-                  {groupBadge.name}
-                </span>
-              )}
-              {!compact && task.status === "in-progress" && (
-                <span style={{ fontSize: 11, fontWeight: 600, color: "#D97706", background: "#FFF8E8", borderRadius: 4, padding: "1px 6px" }}>进行中</span>
-              )}
-              {task.status === "cancelled" && (
-                <span style={{ fontSize: 11, fontWeight: 600, color: "#6B7280", background: "#F3F4F6", borderRadius: 4, padding: "1px 6px" }}>已取消</span>
-              )}
-              {!compact && task.pinned && (
-                <span style={{ fontSize: 11, fontWeight: 600, color: "#3B82F6", background: "#EFF6FF", borderRadius: 4, padding: "1px 6px" }}>置顶</span>
-              )}
-              {/* meta 小标签 */}
-              {hasRecurring && (
-                <span title={`已完成 ${task.recurringCount} 次`} style={{ fontSize: 11, fontWeight: 600, color: "#3B82F6", background: "#EFF6FF", borderRadius: 4, padding: "1px 6px", display: "flex", alignItems: "center", gap: 3 }}>
-                  <RotateCcw size={10} /> {task.recurringCount > 0 ? `×${task.recurringCount}` : "循环"}
-                </span>
-              )}
-              {hasReminder && (
-                <span title={`提醒：${fmtDatetime(task.reminderAt!)}`} style={{ fontSize: 11, fontWeight: 600, color: "#F59E0B", background: "#FFF8E8", borderRadius: 4, padding: "1px 6px", display: "flex", alignItems: "center", gap: 3 }}>
-                  <Bell size={10} /> {fmtDatetime(task.reminderAt!)}
-                </span>
-              )}
-              {hasPeriodic && task.nextDueAt && (
-                <span title={`下次：${fmtDatetime(task.nextDueAt)}`} style={{ fontSize: 11, fontWeight: 600, color: "#8B5CF6", background: "#F5F3FF", borderRadius: 4, padding: "1px 6px", display: "flex", alignItems: "center", gap: 3 }}>
-                  <CalendarClock size={10} /> {fmtDatetime(task.nextDueAt)}
-                </span>
-              )}
-            </div>
-
-            {/* 时间 */}
             {!compact && (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 3, paddingLeft: 17 }}>
-                <span style={{ fontSize: 11, color: "#C4C4C4" }}>创建 {fmt(task.createdAt)}</span>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 7 }}>
+                <MetaPill color={tone.fg} bg={tone.bg}>{STATUS_LABELS[task.status]}</MetaPill>
+                {groupBadge && (
+                  <MetaPill color={groupBadge.color} bg={`${groupBadge.color}18`}>{groupBadge.name}</MetaPill>
+                )}
+                {task.pinned && (
+                  <MetaPill color="#DB2777" bg="rgba(244,114,182,0.14)">
+                    <Pin size={10} /> 置顶
+                  </MetaPill>
+                )}
+                {hasRecurring && (
+                  <MetaPill color="#7C3AED" bg="rgba(139,92,246,0.12)">
+                    <RotateCcw size={10} /> {task.recurringCount > 0 ? `循环 ×${task.recurringCount}` : "循环"}
+                  </MetaPill>
+                )}
+                {hasReminder && (
+                  <MetaPill color="#D97706" bg="rgba(245,158,11,0.14)">
+                    <Bell size={10} /> {friendlyDate(task.reminderAt!)}
+                  </MetaPill>
+                )}
+                {hasPeriodic && task.nextDueAt && (
+                  <MetaPill color="#EA580C" bg="rgba(251,146,60,0.16)">
+                    <CalendarClock size={10} /> {friendlyDate(task.nextDueAt)}
+                  </MetaPill>
+                )}
+              </div>
+            )}
+
+            {compact && (groupBadge || task.status === "cancelled") && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 3 }}>
+                {groupBadge && (
+                  <MetaPill color={groupBadge.color} bg={`${groupBadge.color}18`}>{groupBadge.name}</MetaPill>
+                )}
+                {task.status === "cancelled" && (
+                  <MetaPill color={ui.muted} bg="rgba(23,23,23,0.06)">已取消</MetaPill>
+                )}
+              </div>
+            )}
+
+            {!compact && hovered && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 5 }}>
+                <span style={{ fontSize: 11, color: ui.faint }}>创建 {fmt(task.createdAt)}</span>
                 {task.completedAt && task.status === "done" && (
-                  <span style={{ fontSize: 11, color: "#86EFAC" }}>完成 {fmt(task.completedAt)}</span>
+                  <span style={{ fontSize: 11, color: "#059669" }}>完成 {fmt(task.completedAt)}</span>
                 )}
                 {task.completedAt && task.status === "cancelled" && (
-                  <span style={{ fontSize: 11, color: "#9CA3AF" }}>取消 {fmt(task.completedAt)}</span>
+                  <span style={{ fontSize: 11, color: ui.muted }}>取消 {fmt(task.completedAt)}</span>
                 )}
               </div>
             )}
           </div>
 
-          {/* 操作按钮：hover 渐显，2×3（普通）/ 2×2（compact）网格 */}
           <div style={{
-            display: "grid",
-            gridTemplateColumns: compact ? "repeat(2, 30px)" : "repeat(3, 30px)",
-            gridTemplateRows:    compact ? "repeat(2, 30px)" : "repeat(2, 30px)",
+            display: "flex",
+            alignItems: "center",
             gap: 2,
             flexShrink: 0,
             alignSelf: "center",
-            opacity: hovered ? 1 : 0,
-            transition: "opacity 0.15s",
-            pointerEvents: hovered ? "auto" : "none",
           }}>
-            {/* 行1 */}
-            <ActionBtn onClick={() => { setIsEditing(true); setEditTitle(task.title); }} title="编辑标题">
-              <Pencil size={15} />
-            </ActionBtn>
-            {compact ? (
-              <ActionBtn onClick={() => toggleFavorite(task.id)} title={task.favorited ? "取消收藏" : "收藏"} active={task.favorited} activeColor="#F59E0B">
-                <Star size={15} fill={task.favorited ? "#F59E0B" : "none"} />
-              </ActionBtn>
-            ) : (
-              <>
-                <ActionBtn onClick={() => togglePin(task.id)} title={task.pinned ? "取消置顶" : "置顶"} active={task.pinned} activeColor="#3B82F6">
-                  <Pin size={15} />
-                </ActionBtn>
-                <ActionBtn onClick={() => toggleFavorite(task.id)} title={task.favorited ? "取消收藏" : "收藏"} active={task.favorited} activeColor="#F59E0B">
-                  <Star size={15} fill={task.favorited ? "#F59E0B" : "none"} />
-                </ActionBtn>
-              </>
-            )}
-
-            {/* 行2 */}
             <ActionBtn
               ref={detailBtnRef}
-              onClick={() => openEdit(detailBtnRef)}
+              onClick={openEdit}
               title="查看/编辑备注"
-              active={!!editAnchor}
-              activeColor={accentColor}
+              active={!!editAnchor || hasDetail}
+              activeColor={hasDetail ? accentColor : ui.faint}
             >
               <FileText size={15} />
             </ActionBtn>
-            {compact ? (
-              <ActionBtn onClick={() => deleteTask(task.id)} title="删除" danger>
-                <Trash2 size={15} />
-              </ActionBtn>
-            ) : (
-              <>
-                <ActionBtn
-                  ref={optionsBtnRef}
-                  onClick={openOptions}
-                  title="任务选项（循环/提醒/周期）"
-                  active={!!optionsAnchor}
-                  activeColor="#6B7280"
-                >
-                  <Settings2 size={15} />
-                </ActionBtn>
-                <ActionBtn onClick={() => deleteTask(task.id)} title="删除" danger>
-                  <Trash2 size={15} />
-                </ActionBtn>
-              </>
-            )}
+            <ActionBtn
+              ref={moreBtnRef}
+              onClick={() => {
+                const rect = moreBtnRef.current?.getBoundingClientRect();
+                if (rect) setMoreRect(rect);
+              }}
+              title="更多"
+              active={!!moreRect}
+              activeColor={ui.inkSoft}
+            >
+              <MoreHorizontal size={15} />
+            </ActionBtn>
           </div>
         </div>
       </div>
 
-      {/* 悬停预览气泡（普通任务 + 已完成区均支持） */}
       {previewRect && !editAnchor && hasDetail && (
         <HoverPreview
           accentColor={accentColor}
@@ -442,7 +385,6 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge, dragH
         />
       )}
 
-      {/* 点击触发的备注编辑浮窗（compact 模式也支持，Feature 5） */}
       {editAnchor && (
         <FloatDetailPanel
           task={task}
@@ -452,7 +394,6 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge, dragH
         />
       )}
 
-      {/* 任务选项浮窗 */}
       {optionsAnchor && (
         <TaskOptionsPanel
           task={task}
@@ -461,7 +402,24 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge, dragH
         />
       )}
 
-      {/* 右键状态选择器 */}
+      {moreRect && (
+        <MoreMenu
+          anchorRect={moreRect}
+          compact={compact}
+          pinned={task.pinned}
+          favorited={task.favorited}
+          onEditTitle={() => { setIsEditing(true); setEditTitle(task.title); }}
+          onPin={() => togglePin(task.id)}
+          onFavorite={() => toggleFavorite(task.id)}
+          onOptions={() => {
+            const rect = moreBtnRef.current?.getBoundingClientRect();
+            if (rect) setOptionsAnchor(rect);
+          }}
+          onDelete={() => deleteTask(task.id)}
+          onClose={() => setMoreRect(null)}
+        />
+      )}
+
       {pickerRect && (
         <StatusPicker
           anchorRect={pickerRect}
@@ -477,12 +435,84 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge, dragH
   );
 }
 
-function fmtDatetime(iso: string): string {
+function friendlyDate(iso: string): string {
   const d = new Date(iso);
-  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  const now = new Date();
+  const start = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diff = (start(d) - start(now)) / 86400000;
+  const hm = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  if (diff === 0) return `今天 ${hm}`;
+  if (diff === 1) return `明天 ${hm}`;
+  if (diff === -1) return `昨天 ${hm}`;
+  return `${d.getMonth() + 1}/${d.getDate()} ${hm}`;
 }
 
-// ── 操作按钮 ──────────────────────────────────────────────
+function MoreMenu({
+  anchorRect, compact, pinned, favorited,
+  onEditTitle, onPin, onFavorite, onOptions, onDelete, onClose,
+}: {
+  anchorRect: DOMRect;
+  compact: boolean;
+  pinned: boolean;
+  favorited: boolean;
+  onEditTitle: () => void;
+  onPin: () => void;
+  onFavorite: () => void;
+  onOptions: () => void;
+  onDelete: () => void;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const h = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    const t = setTimeout(() => window.addEventListener("mousedown", h), 80);
+    return () => { clearTimeout(t); window.removeEventListener("mousedown", h); };
+  }, [onClose]);
+
+  const W = 168;
+  let left = anchorRect.right - W;
+  let top = anchorRect.bottom + 6;
+  if (left < 8) left = 8;
+  if (top + 220 > window.innerHeight) top = anchorRect.top - 220;
+
+  const items: { key: string; label: string; icon: React.ReactNode; danger?: boolean; hide?: boolean; run: () => void }[] = [
+    { key: "edit", label: "编辑标题", icon: <Pencil size={14} />, run: onEditTitle },
+    { key: "pin", label: pinned ? "取消置顶" : "置顶", icon: <Pin size={14} />, hide: compact, run: onPin },
+    { key: "fav", label: favorited ? "取消收藏" : "收藏", icon: <Star size={14} />, run: onFavorite },
+    { key: "opt", label: "循环 / 提醒 / 周期", icon: <Settings2 size={14} />, hide: compact, run: onOptions },
+    { key: "del", label: "删除", icon: <Trash2 size={14} />, danger: true, run: onDelete },
+  ];
+
+  return createPortal(
+    <div ref={ref} style={{
+      position: "fixed", left, top, width: W, zIndex: 10000,
+      background: ui.surface, borderRadius: 12,
+      boxShadow: ui.shadowSoft, border: `1px solid ${ui.line}`,
+      padding: 5, animation: "hoverPreviewIn 0.12s ease",
+    }}>
+      {items.filter((it) => !it.hide).map((it) => (
+        <button
+          key={it.key}
+          onClick={() => { it.run(); onClose(); }}
+          style={{
+            width: "100%", display: "flex", alignItems: "center", gap: 8,
+            padding: "8px 10px", borderRadius: 8, fontSize: 13,
+            color: it.danger ? "#EF4444" : ui.inkSoft, textAlign: "left",
+          }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = it.danger ? "#FEE2E2" : "rgba(0,0,0,0.04)"; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+        >
+          {it.icon}
+          {it.label}
+        </button>
+      ))}
+    </div>,
+    document.body
+  );
+}
+
 const ActionBtn = forwardRef<HTMLButtonElement, {
   children: React.ReactNode;
   onClick: () => void;
@@ -497,19 +527,19 @@ const ActionBtn = forwardRef<HTMLButtonElement, {
       onClick={onClick}
       title={title}
       style={{
-        width: 30, height: 30, borderRadius: 7,
+        width: 30, height: 30, borderRadius: 8,
         display: "flex", alignItems: "center", justifyContent: "center",
-        color: active ? activeColor : "#999",
+        color: active ? activeColor : ui.faint,
         background: active ? `${activeColor}15` : "transparent",
         transition: "all 0.12s",
       }}
       onMouseEnter={(e) => {
-        (e.currentTarget as HTMLElement).style.background = danger ? "#FEE2E2" : active ? `${activeColor}25` : "rgba(0,0,0,0.07)";
-        (e.currentTarget as HTMLElement).style.color = danger ? "#EF4444" : active ? activeColor! : "#333";
+        (e.currentTarget as HTMLElement).style.background = danger ? "#FEE2E2" : active ? `${activeColor}25` : "rgba(0,0,0,0.06)";
+        (e.currentTarget as HTMLElement).style.color = danger ? "#EF4444" : active ? activeColor! : ui.ink;
       }}
       onMouseLeave={(e) => {
         (e.currentTarget as HTMLElement).style.background = active ? `${activeColor}15` : "transparent";
-        (e.currentTarget as HTMLElement).style.color = active ? activeColor! : "#999";
+        (e.currentTarget as HTMLElement).style.color = active ? activeColor! : ui.faint;
       }}
     >
       {children}

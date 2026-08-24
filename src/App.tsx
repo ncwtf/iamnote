@@ -11,6 +11,7 @@ import { ArchiveView } from "./components/ArchiveView/ArchiveView";
 import { SettingsPanel } from "./components/SettingsPanel/SettingsPanel";
 import { OverviewView } from "./components/OverviewView/OverviewView";
 import { FAVORITES_GROUP_ID, ARCHIVE_GROUP_ID, OVERVIEW_GROUP_ID, toYearMonth, isEnded } from "./types";
+import { ui } from "./theme";
 import { buildShortcutString } from "./lib/shortcut";
 import { writeSyncFile, resolveOnStartup } from "./lib/sync";
 import { invoke } from "@tauri-apps/api/core";
@@ -151,7 +152,7 @@ function App() {
   }, []);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem("sidebar-width");
-    return saved ? parseInt(saved) : 180;
+    return saved ? parseInt(saved) : 220;
   });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     return localStorage.getItem("sidebar-collapsed") === "true";
@@ -292,53 +293,47 @@ function App() {
   const isArchive   = activeGroupId === ARCHIVE_GROUP_ID;
   const isOverview  = activeGroupId === OVERVIEW_GROUP_ID;
   const activeGroup = groups.find((g) => g.id === activeGroupId);
-  const accentColor = activeGroup?.color ?? "#f59e0b";
 
   return (
     <div
       className="h-screen w-screen overflow-hidden flex flex-col"
       style={{
-        borderRadius: 12,
-        boxShadow: "0 8px 40px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.10)",
-        background: "#FAFAF8",
-        border: "1px solid rgba(0,0,0,0.08)",
+        borderRadius: 16,
+        boxShadow: ui.shadow,
+        background: ui.sidebar,
+        border: "1px solid rgba(23,23,23,0.10)",
       }}
     >
-      <TitleBar
-        onSettingsClick={() => setShowSettings((v) => !v)}
-        groupColor={
-          isFavorites ? "#F59E0B" :
-          isArchive   ? "#6B7280" :
-          isOverview  ? "#10B981" :
-          accentColor
-        }
-      />
-
-      <div className="flex flex-1 overflow-hidden relative">
+      <div className="flex flex-1 overflow-hidden">
         <GroupSidebar
           width={sidebarWidth}
           onWidthChange={handleWidthChange}
           collapsed={sidebarCollapsed}
           onCollapsedChange={handleCollapsedChange}
+          onSettingsClick={() => setShowSettings((v) => !v)}
         />
 
-        {isFavorites ? (
-          <FavoritesView />
-        ) : isArchive ? (
-          <ArchiveView onArchiveNow={handleArchiveNow} archiving={archiving} />
-        ) : isOverview ? (
-          <OverviewView />
-        ) : activeGroup ? (
-          <TaskList group={activeGroup} addTriggerRef={addTaskTriggerRef} />
-        ) : (
-          <div className="flex-1 flex items-center justify-center">
-            <p className="text-sm text-gray-400">请选择或创建一个分组</p>
-          </div>
-        )}
+        <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: ui.canvas }}>
+          <TitleBar />
 
-        {showSettings && (
-          <SettingsPanel onClose={() => setShowSettings(false)} />
-        )}
+          {isFavorites ? (
+            <FavoritesView />
+          ) : isArchive ? (
+            <ArchiveView onArchiveNow={handleArchiveNow} archiving={archiving} />
+          ) : isOverview ? (
+            <OverviewView />
+          ) : activeGroup ? (
+            <TaskList group={activeGroup} addTriggerRef={addTaskTriggerRef} />
+          ) : (
+            <div className="flex-1 flex items-center justify-center">
+              <p className="text-sm" style={{ color: ui.muted }}>请选择或创建一个分组</p>
+            </div>
+          )}
+
+          {showSettings && (
+            <SettingsPanel onClose={() => setShowSettings(false)} />
+          )}
+        </div>
       </div>
 
       {/* ── 应用内提醒 Toast（系统通知的可视兜底） ── */}
@@ -352,9 +347,9 @@ function App() {
             <div
               key={toast.id}
               style={{
-                background: "#fff", borderRadius: 12,
-                boxShadow: "0 6px 24px rgba(0,0,0,0.14), 0 1px 4px rgba(0,0,0,0.08)",
-                border: "1.5px solid #F59E0B50",
+                background: ui.surface, borderRadius: 12,
+                boxShadow: ui.shadowSoft,
+                border: "1px solid rgba(245,158,11,0.28)",
                 padding: "12px 14px 12px 12px",
                 minWidth: 240, maxWidth: 300,
                 display: "flex", alignItems: "flex-start", gap: 10,

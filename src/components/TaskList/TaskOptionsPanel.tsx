@@ -100,9 +100,9 @@ export function TaskOptionsPanel({ task, anchorRect, onClose }: TaskOptionsPanel
       style={{
         position: "fixed", left: pos.x, top: pos.y, width: PANEL_W,
         zIndex: 9999, borderRadius: 12,
-        boxShadow: "0 8px 30px rgba(0,0,0,0.15), 0 2px 6px rgba(0,0,0,0.08)",
-        border: "1.5px solid rgba(0,0,0,0.08)",
-        background: "#fff", overflow: "hidden",
+        boxShadow: "0 8px 28px rgba(42,39,35,0.10), 0 1px 4px rgba(42,39,35,0.05)",
+        border: "1px solid rgba(42,39,35,0.08)",
+        background: "#FFFCF7", overflow: "hidden",
       }}
     >
       {/* 标题栏 */}

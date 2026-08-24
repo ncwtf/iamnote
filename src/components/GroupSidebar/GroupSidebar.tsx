@@ -1,24 +1,34 @@
-import { useState, useRef, useEffect, useCallback } from "react";
-import { Plus, Trash2, Check, Pencil, ChevronLeft, ChevronRight, Star, Archive, LayoutList } from "lucide-react";
+import { useState, useRef, useEffect, useCallback, type CSSProperties } from "react";
+import {
+  Plus, Trash2, Check, Pencil, ChevronLeft, ChevronRight,
+  Star, Archive, LayoutGrid, Settings, Keyboard, Cloud, Pin,
+} from "lucide-react";
 import { useGroupStore } from "../../store/groupStore";
 import { useTaskStore } from "../../store/taskStore";
 import { useArchiveStore } from "../../store/archiveStore";
-import { GROUP_COLORS, FAVORITES_GROUP_ID, ARCHIVE_GROUP_ID, OVERVIEW_GROUP_ID } from "../../types";
+import { useSettingsStore } from "../../store/settingsStore";
+import { GROUP_COLORS, FAVORITES_GROUP_ID, ARCHIVE_GROUP_ID, OVERVIEW_GROUP_ID, isEnded } from "../../types";
+import { tint, ui } from "../../theme";
+import { AppLogo, CountBadge } from "../chrome";
 
 interface GroupSidebarProps {
   width: number;
   onWidthChange: (w: number) => void;
   collapsed: boolean;
   onCollapsedChange: (c: boolean) => void;
+  onSettingsClick: () => void;
 }
 
-const MIN_WIDTH = 150;
+const MIN_WIDTH = 168;
 const MAX_WIDTH = 280;
 
-export function GroupSidebar({ width, onWidthChange, collapsed, onCollapsedChange }: GroupSidebarProps) {
+export function GroupSidebar({
+  width, onWidthChange, collapsed, onCollapsedChange, onSettingsClick,
+}: GroupSidebarProps) {
   const { groups, activeGroupId, addGroup, updateGroup, deleteGroup, setActive } = useGroupStore();
-  const { getFavoritedTasks } = useTaskStore();
+  const { tasks, getFavoritedTasks } = useTaskStore();
   const { archives } = useArchiveStore();
+  const { settings, setAlwaysOnTop } = useSettingsStore();
 
   const [isAdding, setIsAdding] = useState(false);
   const [newName, setNewName] = useState("");
@@ -36,10 +46,14 @@ export function GroupSidebar({ width, onWidthChange, collapsed, onCollapsedChang
   useEffect(() => { if (editingId) editInputRef.current?.focus(); }, [editingId]);
 
   const favCount = getFavoritedTasks().length;
-  const isFavActive      = activeGroupId === FAVORITES_GROUP_ID;
-  const isArchiveActive  = activeGroupId === ARCHIVE_GROUP_ID;
+  const isFavActive = activeGroupId === FAVORITES_GROUP_ID;
+  const isArchiveActive = activeGroupId === ARCHIVE_GROUP_ID;
   const isOverviewActive = activeGroupId === OVERVIEW_GROUP_ID;
   const totalArchived = archives.reduce((sum, a) => sum + a.tasks.length, 0);
+  const overviewCount = tasks.filter((t) => !isEnded(t.status)).length;
+
+  const groupCount = (id: string) =>
+    tasks.filter((t) => t.groupId === id && !isEnded(t.status)).length;
 
   const handleAdd = () => {
     const name = newName.trim();
@@ -74,70 +88,31 @@ export function GroupSidebar({ width, onWidthChange, collapsed, onCollapsedChang
     document.addEventListener("mouseup", onUp);
   }, [width, onWidthChange]);
 
-  // ── 折叠状态 ──────────────────────────────────────────────
   if (collapsed) {
     return (
       <div
         className="flex flex-col items-center py-3 gap-2 flex-shrink-0"
-        style={{ width: 48, background: "#F0EDE8", borderRight: "1px solid rgba(0,0,0,0.07)" }}
+        style={{ width: 52, background: ui.sidebar, borderRight: `1px solid ${ui.line}` }}
       >
         <button
           onClick={() => onCollapsedChange(false)}
           title="展开分组"
-          style={{ width: 32, height: 32, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", color: "#888" }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.06)"; }}
+          style={{ width: 32, height: 32, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", color: ui.muted }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.05)"; }}
           onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
         >
           <ChevronRight size={16} />
         </button>
 
-        {/* 收藏 dot */}
-        <button
-          title="收藏"
-          onClick={() => setActive(FAVORITES_GROUP_ID)}
-          style={{
-            width: 22, height: 22, borderRadius: "50%",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            backgroundColor: isFavActive ? "#F59E0B" : "#E5E7EB",
-            border: `2.5px solid ${isFavActive ? "#fff" : "transparent"}`,
-            boxShadow: isFavActive ? "0 0 0 2px #F59E0B" : "none",
-            transition: "all 0.15s",
-          }}
-        >
+        <CollapsedDot title="收藏" active={isFavActive} onClick={() => setActive(FAVORITES_GROUP_ID)}>
           <Star size={11} color={isFavActive ? "#fff" : "#999"} fill={isFavActive ? "#fff" : "none"} />
-        </button>
-
-        {/* 归档 dot */}
-        <button
-          title="归档"
-          onClick={() => setActive(ARCHIVE_GROUP_ID)}
-          style={{
-            width: 22, height: 22, borderRadius: "50%",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            backgroundColor: isArchiveActive ? "#6B7280" : "#E5E7EB",
-            border: `2.5px solid ${isArchiveActive ? "#fff" : "transparent"}`,
-            boxShadow: isArchiveActive ? "0 0 0 2px #6B7280" : "none",
-            transition: "all 0.15s",
-          }}
-        >
+        </CollapsedDot>
+        <CollapsedDot title="归档" active={isArchiveActive} onClick={() => setActive(ARCHIVE_GROUP_ID)}>
           <Archive size={11} color={isArchiveActive ? "#fff" : "#999"} />
-        </button>
-
-        {/* 总览 dot */}
-        <button
-          title="任务总览"
-          onClick={() => setActive(OVERVIEW_GROUP_ID)}
-          style={{
-            width: 22, height: 22, borderRadius: "50%",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            backgroundColor: isOverviewActive ? "#10B981" : "#E5E7EB",
-            border: `2.5px solid ${isOverviewActive ? "#fff" : "transparent"}`,
-            boxShadow: isOverviewActive ? "0 0 0 2px #10B981" : "none",
-            transition: "all 0.15s",
-          }}
-        >
-          <LayoutList size={11} color={isOverviewActive ? "#fff" : "#999"} />
-        </button>
+        </CollapsedDot>
+        <CollapsedDot title="全部任务" active={isOverviewActive} onClick={() => setActive(OVERVIEW_GROUP_ID)}>
+          <LayoutGrid size={11} color={isOverviewActive ? "#fff" : "#999"} />
+        </CollapsedDot>
 
         <div className="flex flex-col gap-2.5 mt-1">
           {groups.map((group) => (
@@ -147,9 +122,9 @@ export function GroupSidebar({ width, onWidthChange, collapsed, onCollapsedChang
               onClick={() => setActive(group.id)}
               style={{
                 width: 22, height: 22, borderRadius: "50%",
-                backgroundColor: group.color,
-                border: `2.5px solid ${activeGroupId === group.id ? "#fff" : "transparent"}`,
-                boxShadow: activeGroupId === group.id ? `0 0 0 2px ${group.color}` : "none",
+                backgroundColor: group.color, border: "none",
+                boxShadow: activeGroupId === group.id ? `0 0 0 3px ${tint(ui.accent, 0.28)}` : "none",
+                opacity: activeGroupId === group.id ? 1 : 0.72,
                 transition: "all 0.15s",
               }}
             />
@@ -159,147 +134,78 @@ export function GroupSidebar({ width, onWidthChange, collapsed, onCollapsedChang
     );
   }
 
-  // ── 展开状态 ──────────────────────────────────────────────
   return (
     <div className="flex flex-shrink-0 relative" style={{ width }}>
       <div
         className="flex flex-col w-full overflow-hidden"
-        style={{ background: "#F0EDE8", borderRight: "1px solid rgba(0,0,0,0.07)" }}
+        style={{ background: ui.sidebar, borderRight: `1px solid ${ui.line}` }}
       >
-        {/* 头部 */}
         <div
-          className="flex items-center justify-between"
-          style={{ padding: "12px 14px 10px", borderBottom: "1px solid rgba(0,0,0,0.06)" }}
+          data-tauri-drag-region
+          className="flex items-center gap-2.5"
+          style={{ padding: "14px 16px 12px" }}
         >
-          <span style={{ fontSize: 11, fontWeight: 700, color: "#999", letterSpacing: "0.08em", textTransform: "uppercase" }}>
-            分组
+          <AppLogo size={26} />
+          <span style={{ fontSize: 15, fontWeight: 700, letterSpacing: "-0.03em", color: ui.ink }}>
+            iamnote
           </span>
-          <div className="flex items-center gap-1">
-            <SidebarIconBtn onClick={() => { setIsAdding(true); setNewName(""); }} title="新建分组">
-              <Plus size={14} />
-            </SidebarIconBtn>
-            <SidebarIconBtn onClick={() => onCollapsedChange(true)} title="折叠">
-              <ChevronLeft size={14} />
-            </SidebarIconBtn>
-          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto" style={{ padding: "6px 0" }}>
-          {/* ── 收藏分组（固定在顶部，不可删除） ─── */}
-          <div style={{ padding: "0 8px", marginBottom: 4 }}>
-            <div
-              onClick={() => { setActive(FAVORITES_GROUP_ID); setEditingId(null); setColorPickerFor(null); }}
-              style={{
-                display: "flex", alignItems: "center", gap: 10,
-                borderRadius: 8, padding: "7px 10px", cursor: "pointer",
-                background: isFavActive ? "#fff" : "transparent",
-                boxShadow: isFavActive ? "0 1px 4px rgba(0,0,0,0.10)" : "none",
-                transition: "all 0.15s",
-              }}
-              onMouseEnter={(e) => { if (!isFavActive) (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.04)"; }}
-              onMouseLeave={(e) => { if (!isFavActive) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
-            >
-              <Star
-                size={13}
-                color="#F59E0B"
-                fill={isFavActive ? "#F59E0B" : "none"}
-                style={{ flexShrink: 0 }}
-              />
-              <span style={{ flex: 1, fontSize: 13, fontWeight: isFavActive ? 600 : 400, color: isFavActive ? "#1c1c1e" : "#555" }}>
-                收藏
-              </span>
-              {favCount > 0 && (
-                <span style={{
-                  fontSize: 11, fontWeight: 600, color: "#F59E0B",
-                  background: "#FEF3C7", borderRadius: 8, padding: "1px 6px",
-                  flexShrink: 0,
-                }}>
-                  {favCount}
-                </span>
-              )}
+        <div className="flex-1 overflow-y-auto" style={{ padding: "4px 10px 8px" }}>
+          <NavRow
+            active={isFavActive}
+            onClick={() => { setActive(FAVORITES_GROUP_ID); setEditingId(null); setColorPickerFor(null); }}
+            icon={<Star size={15} />}
+            label="收藏"
+            count={favCount}
+          />
+          <NavRow
+            active={isArchiveActive}
+            onClick={() => { setActive(ARCHIVE_GROUP_ID); setEditingId(null); setColorPickerFor(null); }}
+            icon={<Archive size={15} />}
+            label="归档"
+            count={totalArchived}
+          />
+          <NavRow
+            active={isOverviewActive}
+            onClick={() => { setActive(OVERVIEW_GROUP_ID); setEditingId(null); setColorPickerFor(null); }}
+            icon={<LayoutGrid size={15} />}
+            label="全部任务"
+            count={overviewCount}
+          />
+
+          <div className="flex items-center justify-between" style={{ padding: "16px 6px 8px" }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: ui.faint, letterSpacing: "0.08em" }}>
+              分组
+            </span>
+            <div className="flex items-center gap-0.5">
+              <SidebarIconBtn onClick={() => { setIsAdding(true); setNewName(""); }} title="新建分组">
+                <Plus size={14} />
+              </SidebarIconBtn>
+              <SidebarIconBtn onClick={() => onCollapsedChange(true)} title="折叠">
+                <ChevronLeft size={14} />
+              </SidebarIconBtn>
             </div>
           </div>
 
-          {/* 归档分组（固定在收藏下方） */}
-          <div style={{ padding: "0 8px", marginBottom: 4 }}>
-            <div
-              onClick={() => { setActive(ARCHIVE_GROUP_ID); setEditingId(null); setColorPickerFor(null); }}
-              style={{
-                display: "flex", alignItems: "center", gap: 10,
-                borderRadius: 8, padding: "7px 10px", cursor: "pointer",
-                background: isArchiveActive ? "#fff" : "transparent",
-                boxShadow: isArchiveActive ? "0 1px 4px rgba(0,0,0,0.10)" : "none",
-                transition: "all 0.15s",
-              }}
-              onMouseEnter={(e) => { if (!isArchiveActive) (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.04)"; }}
-              onMouseLeave={(e) => { if (!isArchiveActive) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
-            >
-              <Archive
-                size={13}
-                color="#6B7280"
-                style={{ flexShrink: 0 }}
-              />
-              <span style={{ flex: 1, fontSize: 13, fontWeight: isArchiveActive ? 600 : 400, color: isArchiveActive ? "#1c1c1e" : "#555" }}>
-                归档
-              </span>
-              {totalArchived > 0 && (
-                <span style={{
-                  fontSize: 11, fontWeight: 600, color: "#6B7280",
-                  background: "#F3F4F6", borderRadius: 8, padding: "1px 6px",
-                  flexShrink: 0,
-                }}>
-                  {totalArchived}
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* 总览 */}
-          <div style={{ padding: "0 8px", marginBottom: 4 }}>
-            <div
-              onClick={() => { setActive(OVERVIEW_GROUP_ID); setEditingId(null); setColorPickerFor(null); }}
-              style={{
-                display: "flex", alignItems: "center", gap: 10,
-                borderRadius: 8, padding: "7px 10px", cursor: "pointer",
-                background: isOverviewActive ? "#fff" : "transparent",
-                boxShadow: isOverviewActive ? "0 1px 4px rgba(0,0,0,0.10)" : "none",
-                transition: "all 0.15s",
-              }}
-              onMouseEnter={(e) => { if (!isOverviewActive) (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.04)"; }}
-              onMouseLeave={(e) => { if (!isOverviewActive) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
-            >
-              <LayoutList size={13} color="#10B981" style={{ flexShrink: 0 }} />
-              <span style={{ flex: 1, fontSize: 13, fontWeight: isOverviewActive ? 600 : 400, color: isOverviewActive ? "#1c1c1e" : "#555" }}>
-                总览
-              </span>
-            </div>
-          </div>
-
-          {/* 分割线 */}
-          <div style={{ margin: "4px 14px 6px", borderTop: "1px solid rgba(0,0,0,0.07)" }} />
-
-          {/* ── 用户分组 ─── */}
           {groups.map((group) => {
             const isActive = activeGroupId === group.id;
+            const count = groupCount(group.id);
             return (
-              <div key={group.id} className="relative" style={{ padding: "0 8px", marginBottom: 2 }}>
+              <div key={group.id} className="relative" style={{ marginBottom: 2 }}>
                 <div
                   className="flex items-center gap-2.5 group/item"
                   onClick={() => { setActive(group.id); setEditingId(null); setColorPickerFor(null); }}
-                  style={{
-                    borderRadius: 8, padding: "7px 10px", cursor: "pointer",
-                    background: isActive ? "#fff" : "transparent",
-                    boxShadow: isActive ? "0 1px 4px rgba(0,0,0,0.10)" : "none",
-                    transition: "all 0.15s",
-                  }}
-                  onMouseEnter={(e) => { if (!isActive) (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.04)"; }}
+                  style={navStyle(isActive)}
+                  onMouseEnter={(e) => { if (!isActive) (e.currentTarget as HTMLElement).style.background = "rgba(23,23,23,0.04)"; }}
                   onMouseLeave={(e) => { if (!isActive) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
                 >
-                  {/* 颜色点 */}
                   <button
                     style={{
-                      width: 12, height: 12, borderRadius: "50%", flexShrink: 0,
-                      backgroundColor: group.color, border: "1.5px solid rgba(0,0,0,0.1)", cursor: "pointer",
+                      width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
+                      backgroundColor: isActive ? "#fff" : group.color,
+                      border: "none", cursor: "pointer",
+                      boxShadow: isActive ? "none" : `0 0 0 2px ${tint(group.color, 0.22)}`,
                     }}
                     onClick={(e) => { e.stopPropagation(); setColorPickerFor(colorPickerFor === group.id ? null : group.id); }}
                     title="更改颜色"
@@ -316,17 +222,25 @@ export function GroupSidebar({ width, onWidthChange, collapsed, onCollapsedChang
                         if (e.key === "Escape") setEditingId(null);
                       }}
                       onClick={(e) => e.stopPropagation()}
-                      style={{ flex: 1, fontSize: 13, background: "transparent", borderBottom: "1px solid #ccc", color: "#1c1c1e" }}
+                      style={{
+                        flex: 1, fontSize: 13, background: "transparent",
+                        borderBottom: `1px solid ${isActive ? "rgba(255,255,255,0.45)" : ui.lineStrong}`,
+                        color: isActive ? "#fff" : ui.ink,
+                      }}
                     />
                   ) : (
-                    <span style={{ flex: 1, fontSize: 13, fontWeight: isActive ? 600 : 400, color: isActive ? "#1c1c1e" : "#555", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <span style={{
+                      flex: 1, fontSize: 13, fontWeight: isActive ? 600 : 500,
+                      color: isActive ? "#fff" : ui.inkSoft,
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    }}>
                       {group.name}
                     </span>
                   )}
 
-                  {/* 操作按钮 */}
                   <div className="hidden group-hover/item:flex items-center gap-0.5">
                     <SidebarIconBtn
+                      inverse={isActive}
                       onClick={(e) => { e.stopPropagation(); setEditingId(group.id); setEditName(group.name); }}
                       title="重命名"
                     >
@@ -334,6 +248,7 @@ export function GroupSidebar({ width, onWidthChange, collapsed, onCollapsedChang
                     </SidebarIconBtn>
                     {groups.length > 1 && (
                       <SidebarIconBtn
+                        inverse={isActive}
                         onClick={(e) => { e.stopPropagation(); deleteGroup(group.id); }}
                         title="删除" danger
                       >
@@ -341,17 +256,22 @@ export function GroupSidebar({ width, onWidthChange, collapsed, onCollapsedChang
                       </SidebarIconBtn>
                     )}
                   </div>
+
+                  {count > 0 && (
+                    <span className="group-hover/item:hidden">
+                      <CountBadge inverse={isActive}>{count}</CountBadge>
+                    </span>
+                  )}
                 </div>
 
-                {/* 颜色选择器 */}
                 {colorPickerFor === group.id && (
                   <div
-                    className="absolute left-4 z-30 grid grid-cols-4 gap-2"
+                    className="absolute left-3 z-30 grid grid-cols-4 gap-2"
                     style={{
                       top: "calc(100% + 4px)", padding: 10,
-                      background: "#fff", borderRadius: 10,
-                      boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
-                      border: "1px solid rgba(0,0,0,0.08)",
+                      background: ui.surface, borderRadius: 12,
+                      boxShadow: ui.shadowSoft,
+                      border: `1px solid ${ui.line}`,
                     }}
                     onClick={(e) => e.stopPropagation()}
                   >
@@ -360,7 +280,7 @@ export function GroupSidebar({ width, onWidthChange, collapsed, onCollapsedChang
                         key={color}
                         style={{
                           width: 22, height: 22, borderRadius: "50%", backgroundColor: color,
-                          border: group.color === color ? "2.5px solid #1c1c1e" : "2px solid transparent",
+                          border: group.color === color ? "2.5px solid #171717" : "2px solid transparent",
                           display: "flex", alignItems: "center", justifyContent: "center",
                         }}
                         onClick={() => { updateGroup(group.id, { color }); setColorPickerFor(null); }}
@@ -374,10 +294,9 @@ export function GroupSidebar({ width, onWidthChange, collapsed, onCollapsedChang
             );
           })}
 
-          {/* 新建输入 */}
           {isAdding && (
-            <div className="flex items-center gap-2.5" style={{ padding: "7px 18px" }}>
-              <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#ddd", flexShrink: 0 }} />
+            <div className="flex items-center gap-2.5" style={{ padding: "8px 10px" }}>
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#ddd", flexShrink: 0 }} />
               <input
                 ref={addInputRef}
                 value={newName}
@@ -385,44 +304,165 @@ export function GroupSidebar({ width, onWidthChange, collapsed, onCollapsedChang
                 onBlur={handleAdd}
                 onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); if (e.key === "Escape") setIsAdding(false); }}
                 placeholder="分组名称..."
-                style={{ flex: 1, fontSize: 13, background: "transparent", borderBottom: "1px solid #ccc", color: "#1c1c1e" }}
+                style={{ flex: 1, fontSize: 13, background: "transparent", borderBottom: `1px solid ${ui.lineStrong}`, color: ui.ink }}
               />
             </div>
           )}
         </div>
+
+        <div
+          className="flex items-center justify-between"
+          style={{ padding: "10px 14px 12px", borderTop: `1px solid ${ui.line}` }}
+        >
+          <DockBtn title="设置" onClick={onSettingsClick}><Settings size={16} /></DockBtn>
+          <DockBtn title="快捷键" onClick={onSettingsClick}><Keyboard size={16} /></DockBtn>
+          <DockBtn title="云端同步" onClick={onSettingsClick}><Cloud size={16} /></DockBtn>
+          <DockBtn
+            title={settings.alwaysOnTop ? "取消置顶" : "窗口置顶"}
+            onClick={() => setAlwaysOnTop(!settings.alwaysOnTop)}
+            active={settings.alwaysOnTop}
+          >
+            <Pin size={16} />
+          </DockBtn>
+        </div>
       </div>
 
-      {/* 拖拽把手 */}
       <div
         style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 4, cursor: "col-resize", zIndex: 10 }}
         onMouseDown={handleResizeMouseDown}
-        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.12)"; }}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(59,130,246,0.28)"; }}
         onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
       />
     </div>
   );
 }
 
+function navStyle(active: boolean): CSSProperties {
+  return {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 12,
+    padding: "8px 10px",
+    cursor: "pointer",
+    background: active ? ui.accentGrad : "transparent",
+    boxShadow: active ? ui.accentShadow : "none",
+    color: active ? "#fff" : ui.inkSoft,
+    transition: "background 0.15s, box-shadow 0.15s",
+  };
+}
+
+function NavRow({
+  active, onClick, icon, label, count,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+  count: number;
+}) {
+  return (
+    <div
+      onClick={onClick}
+      style={{ ...navStyle(active), marginBottom: 4 }}
+      onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLElement).style.background = "rgba(23,23,23,0.04)"; }}
+      onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+    >
+      <span style={{ display: "flex", color: active ? "#fff" : ui.muted }}>{icon}</span>
+      <span style={{ flex: 1, fontSize: 13, fontWeight: active ? 600 : 500, color: active ? "#fff" : ui.inkSoft }}>
+        {label}
+      </span>
+      {count > 0 && <CountBadge inverse={active}>{count}</CountBadge>}
+    </div>
+  );
+}
+
+function CollapsedDot({
+  title, active, onClick, children,
+}: {
+  title: string;
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      title={title}
+      onClick={onClick}
+      style={{
+        width: 22, height: 22, borderRadius: "50%",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        backgroundColor: active ? ui.accent : tint("#8A8479", 0.16),
+        boxShadow: active ? `0 0 0 3px ${tint(ui.accent, 0.22)}` : "none",
+        border: "none",
+        transition: "all 0.15s",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 function SidebarIconBtn({
-  children, onClick, title, danger,
+  children, onClick, title, danger, inverse,
 }: {
   children: React.ReactNode;
   onClick?: (e: React.MouseEvent) => void;
   title?: string;
   danger?: boolean;
+  inverse?: boolean;
+}) {
+  const idle = inverse ? "rgba(255,255,255,0.78)" : ui.muted;
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      style={{
+        width: 24, height: 24, borderRadius: 7,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        color: idle,
+      }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLElement).style.background = danger
+          ? "rgba(239,68,68,0.16)"
+          : inverse ? "rgba(255,255,255,0.16)" : "rgba(23,23,23,0.06)";
+        (e.currentTarget as HTMLElement).style.color = danger ? "#EF4444" : inverse ? "#fff" : ui.ink;
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLElement).style.background = "transparent";
+        (e.currentTarget as HTMLElement).style.color = idle;
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function DockBtn({
+  children, onClick, title, active,
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  title?: string;
+  active?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
       title={title}
-      style={{ width: 26, height: 26, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", color: "#888" }}
+      style={{
+        width: 30, height: 30, borderRadius: 8,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        color: active ? ui.accent : ui.faint,
+        background: active ? "rgba(59,130,246,0.12)" : "transparent",
+      }}
       onMouseEnter={(e) => {
-        (e.currentTarget as HTMLElement).style.background = danger ? "#FEE2E2" : "rgba(0,0,0,0.07)";
-        (e.currentTarget as HTMLElement).style.color = danger ? "#EF4444" : "#333";
+        (e.currentTarget as HTMLElement).style.color = ui.inkSoft;
+        (e.currentTarget as HTMLElement).style.background = "rgba(23,23,23,0.05)";
       }}
       onMouseLeave={(e) => {
-        (e.currentTarget as HTMLElement).style.background = "transparent";
-        (e.currentTarget as HTMLElement).style.color = "#888";
+        (e.currentTarget as HTMLElement).style.color = active ? ui.accent : ui.faint;
+        (e.currentTarget as HTMLElement).style.background = active ? "rgba(59,130,246,0.12)" : "transparent";
       }}
     >
       {children}

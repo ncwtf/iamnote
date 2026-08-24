@@ -3,13 +3,15 @@ import { useTaskStore } from "../../store/taskStore";
 import { useGroupStore } from "../../store/groupStore";
 import { TaskItem } from "../TaskList/TaskItem";
 import { Task } from "../../types";
+import { tint, ui } from "../../theme";
+import { PageHeader } from "../chrome";
 
 type Filter = "all" | "todo" | "in-progress" | "done" | "cancelled";
 
 const FILTERS: { key: Filter; label: string; color: string }[] = [
   { key: "all",         label: "全部",   color: "#6B7280" },
   { key: "todo",        label: "待办",   color: "#9CA3AF" },
-  { key: "in-progress", label: "进行中", color: "#F59E0B" },
+  { key: "in-progress", label: "进行中", color: "#3B82F6" },
   { key: "done",        label: "已完成", color: "#10B981" },
   { key: "cancelled",   label: "已取消", color: "#9CA3AF" },
 ];
@@ -48,19 +50,11 @@ export function OverviewView() {
   };
 
   return (
-    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: "#FAFAF8" }}>
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: ui.canvas }}>
       {/* 顶部栏 */}
-      <div style={{
-        padding: "14px 18px 10px",
-        borderBottom: "2px solid #6B728030",
-        background: "#fff", flexShrink: 0,
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-          <span style={{ fontSize: 16, fontWeight: 700, color: "#1c1c1e" }}>📋 任务总览</span>
-          <span style={{ fontSize: 12, color: "#9CA3AF", background: "#F3F4F6", borderRadius: 10, padding: "1px 8px" }}>
-            {allTasks.length} 项
-          </span>
-        </div>
+      <div style={{ flexShrink: 0 }}>
+        <PageHeader title="全部任务" count={allTasks.length} />
+        <div style={{ padding: "0 22px 12px" }}>
 
         {/* 搜索框 */}
         <input
@@ -68,9 +62,9 @@ export function OverviewView() {
           onChange={(e) => setSearch(e.target.value)}
           placeholder="搜索任务名称…"
           style={{
-            width: "100%", fontSize: 13, padding: "6px 10px",
-            border: "1px solid #E5E7EB", borderRadius: 8,
-            background: "#FAFAFA", color: "#1c1c1e",
+            width: "100%", fontSize: 13, padding: "7px 11px",
+            border: `1px solid ${ui.lineStrong}`, borderRadius: 9,
+            background: ui.card, color: ui.ink,
             marginBottom: 10,
           }}
         />
@@ -84,8 +78,8 @@ export function OverviewView() {
               style={{
                 fontSize: 12, fontWeight: 600,
                 padding: "4px 10px", borderRadius: 20,
-                color: filter === f.key ? "#fff" : f.color,
-                background: filter === f.key ? f.color : `${f.color}15`,
+                color: filter === f.key ? f.color : ui.muted,
+                background: filter === f.key ? tint(f.color, 0.16) : "transparent",
                 transition: "all 0.15s",
               }}
             >
@@ -94,10 +88,11 @@ export function OverviewView() {
             </button>
           ))}
         </div>
+        </div>
       </div>
 
       {/* 任务列表 */}
-      <div style={{ flex: 1, overflowY: "auto" }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: "4px 16px 16px" }}>
         {filtered.length === 0 ? (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: "#C4C4C4", gap: 8 }}>
             <span style={{ fontSize: 32 }}>🔍</span>
@@ -121,13 +116,12 @@ export function OverviewView() {
 function GroupSection({ name, color, tasks }: { name: string; color: string; tasks: Task[] }) {
   const [collapsed, setCollapsed] = useState(false);
   return (
-    <div style={{ borderBottom: "1px solid rgba(0,0,0,0.05)" }}>
+    <div style={{ marginBottom: 8 }}>
       <button
         onClick={() => setCollapsed((v) => !v)}
         style={{
           width: "100%", display: "flex", alignItems: "center", gap: 8,
-          padding: "8px 14px", background: "#fff",
-          borderBottom: collapsed ? "none" : "1px solid rgba(0,0,0,0.04)",
+          padding: "8px 6px", background: "transparent",
         }}
       >
         <div style={{ width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0 }} />

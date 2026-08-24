@@ -82,7 +82,7 @@ export const STATUS_LABELS: Record<Task["status"], string> = {
 
 export const STATUS_COLORS: Record<Task["status"], string> = {
   todo: "#D1D5DB",
-  "in-progress": "#F59E0B",
+  "in-progress": "#3B82F6",
   done: "#10B981",
   cancelled: "#9CA3AF",
 };

@@ -2,6 +2,8 @@ import { Star } from "lucide-react";
 import { useTaskStore } from "../../store/taskStore";
 import { useGroupStore } from "../../store/groupStore";
 import { TaskItem } from "../TaskList/TaskItem";
+import { ui } from "../../theme";
+import { PageHeader } from "../chrome";
 
 export function FavoritesView() {
   const { getFavoritedTasks } = useTaskStore();
@@ -22,29 +24,15 @@ export function FavoritesView() {
   });
 
   return (
-    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: "#FAFAF8" }}>
-      {/* 顶部栏 */}
-      <div style={{
-        display: "flex", alignItems: "center", gap: 10,
-        padding: "14px 18px",
-        borderBottom: "2px solid #FEF3C730",
-        background: "#fff",
-        flexShrink: 0,
-      }}>
-        <Star size={16} color="#F59E0B" fill="#F59E0B" />
-        <span style={{ fontSize: 16, fontWeight: 700, color: "#1c1c1e" }}>收藏</span>
-        {favTasks.length > 0 && (
-          <span style={{
-            fontSize: 12, fontWeight: 500, color: "#999",
-            background: "#F3F4F6", borderRadius: 10, padding: "1px 8px",
-          }}>
-            {favTasks.length} 项
-          </span>
-        )}
-      </div>
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: ui.canvas }}>
+      <PageHeader
+        title="收藏"
+        count={favTasks.length}
+        leading={<Star size={18} color="#D97706" fill="#D97706" />}
+      />
 
       {/* 内容区 */}
-      <div style={{ flex: 1, overflowY: "auto" }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: "4px 16px 16px" }}>
         {favTasks.length === 0 ? (
           /* 空状态 */
           <div style={{
@@ -59,8 +47,8 @@ export function FavoritesView() {
             }}>
               <Star size={22} color="#F59E0B" />
             </div>
-            <p style={{ fontSize: 15, fontWeight: 600, color: "#999", marginBottom: 6 }}>还没有收藏任何任务</p>
-            <p style={{ fontSize: 13, color: "#bbb" }}>在任务上点击 ★ 即可收藏，收藏后在这里统一查看</p>
+            <p style={{ fontSize: 15, fontWeight: 600, color: ui.muted, marginBottom: 6 }}>还没有收藏</p>
+            <p style={{ fontSize: 13, color: ui.faint }}>在任务上点星标，就会出现在这里</p>
           </div>
         ) : (
           /* 按分组展示 */
@@ -73,8 +61,7 @@ export function FavoritesView() {
                 {/* 分组标题 */}
                 <div style={{
                   display: "flex", alignItems: "center", gap: 8,
-                  padding: "10px 18px 6px",
-                  borderBottom: `1px solid ${group.color}20`,
+                  padding: "10px 6px 8px",
                 }}>
                   <div style={{
                     width: 8, height: 8, borderRadius: "50%",

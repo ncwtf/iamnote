@@ -8,6 +8,8 @@ import { useSettingsStore } from "../../store/settingsStore";
 import { ArchivedTask, ArchiveMonth, isEnded, toYearMonth } from "../../types";
 import { HoverPreview } from "../TaskList/FloatDetailPanel";
 import { useStickyPreview } from "../../lib/useStickyPreview";
+import { ui } from "../../theme";
+import { PageHeader } from "../chrome";
 
 // ── Excel 导出工具 ───────────────────────────────────────────
 function fmtDate(iso: string | null) {
@@ -151,7 +153,7 @@ function ArchivedTaskRow({ task }: { task: ArchivedTask }) {
           <div style={{ marginTop: 6, marginLeft: 30, display: "flex", gap: 16 }}>
             <span style={{ fontSize: 11, color: "#C4C4C4" }}>创建 {fmt(task.createdAt)}</span>
             {task.completedAt && (
-              <span style={{ fontSize: 11, color: cancelled ? "#9CA3AF" : "#86EFAC" }}>
+              <span style={{ fontSize: 11, color: cancelled ? "#9CA3AF" : "#059669" }}>
                 {cancelled ? "取消" : "完成"} {fmt(task.completedAt)}
               </span>
             )}
@@ -207,16 +209,13 @@ export function ArchiveView({ onArchiveNow, archiving }: ArchiveViewProps) {
   const thisMonth = toYearMonth(new Date());
 
   return (
-    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: "#FAFAF8" }}>
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: ui.canvas }}>
       {/* 顶部栏 */}
-      <div style={{
-        display: "flex", alignItems: "center", gap: 10,
-        padding: "14px 18px",
-        borderBottom: "2px solid rgba(107,114,128,0.12)",
-        background: "#fff", flexShrink: 0,
-      }}>
-        <Archive size={16} color="#6B7280" />
-        <span style={{ fontSize: 16, fontWeight: 700, color: "#1c1c1e", flex: 1 }}>归档</span>
+      <PageHeader
+        title="归档"
+        leading={<Archive size={18} color={ui.muted} />}
+        actions={
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
 
         {/* 导出按钮组（有归档记录时显示） */}
         {archives.length > 0 && (
@@ -231,12 +230,12 @@ export function ArchiveView({ onArchiveNow, archiving }: ArchiveViewProps) {
                 style={{
                   display: "flex", alignItems: "center", gap: 5,
                   padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600,
-                  color: "#10B981", backgroundColor: "#ECFDF5",
-                  border: "1.5px solid #A7F3D0",
+                  color: "#059669", backgroundColor: "rgba(16,185,129,0.12)",
+                  border: "1px solid rgba(16,185,129,0.22)",
                   transition: "all 0.15s",
                 }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = "#D1FAE5"; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = "#ECFDF5"; }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = "rgba(16,185,129,0.2)"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = "rgba(16,185,129,0.12)"; }}
               >
                 <FileSpreadsheet size={13} />
                 导出本月
@@ -251,12 +250,12 @@ export function ArchiveView({ onArchiveNow, archiving }: ArchiveViewProps) {
               style={{
                 display: "flex", alignItems: "center", gap: 5,
                 padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600,
-                color: "#3B82F6", backgroundColor: "#EFF6FF",
-                border: "1.5px solid #BFDBFE",
+                color: "#2563EB", backgroundColor: "rgba(59,130,246,0.12)",
+                border: "1px solid rgba(59,130,246,0.22)",
                 transition: "all 0.15s",
               }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = "#DBEAFE"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = "#EFF6FF"; }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = "rgba(59,130,246,0.2)"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = "rgba(59,130,246,0.12)"; }}
             >
               <Download size={13} />
               导出全部
@@ -271,8 +270,8 @@ export function ArchiveView({ onArchiveNow, archiving }: ArchiveViewProps) {
             style={{
               display: "flex", alignItems: "center", gap: 6,
               padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600,
-              color: "#fff", backgroundColor: "#6B7280",
-              boxShadow: "0 2px 6px rgba(107,114,128,0.30)",
+              color: ui.inkSoft, backgroundColor: "rgba(42,39,35,0.08)",
+              boxShadow: "none",
               opacity: archiving ? 0.6 : 1, transition: "opacity 0.15s",
             }}
             onMouseEnter={(e) => { if (!archiving) (e.currentTarget as HTMLElement).style.opacity = "0.85"; }}
@@ -282,7 +281,9 @@ export function ArchiveView({ onArchiveNow, archiving }: ArchiveViewProps) {
             {archiving ? "归档中..." : `手动归档 (${doneTasks.length} 项)`}
           </button>
         )}
-      </div>
+          </div>
+        }
+      />
 
       {archives.length === 0 ? (
         /* 空状态 */
@@ -309,8 +310,8 @@ export function ArchiveView({ onArchiveNow, archiving }: ArchiveViewProps) {
           {/* 左侧月份列表 */}
           <div style={{
             width: 130, flexShrink: 0, overflowY: "auto",
-            borderRight: "1px solid rgba(0,0,0,0.07)",
-            background: "#F9FAFB",
+            borderRight: `1px solid ${ui.line}`,
+            background: ui.paperDeep,
             padding: "8px 0",
           }}>
             {archives.map((a) => {
@@ -323,14 +324,14 @@ export function ArchiveView({ onArchiveNow, archiving }: ArchiveViewProps) {
                   style={{
                     width: "100%", textAlign: "left",
                     padding: "8px 14px",
-                    background: isSelected ? "#fff" : "transparent",
-                    borderLeft: isSelected ? "3px solid #6B7280" : "3px solid transparent",
+                    background: isSelected ? "rgba(59,130,246,0.10)" : "transparent",
+                    borderLeft: isSelected ? `3px solid ${ui.accent}` : "3px solid transparent",
                     transition: "all 0.12s",
                   }}
                   onMouseEnter={(e) => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.03)"; }}
                   onMouseLeave={(e) => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
                 >
-                  <div style={{ fontSize: 12, fontWeight: isSelected ? 700 : 500, color: isSelected ? "#1c1c1e" : "#6B7280" }}>
+                  <div style={{ fontSize: 12, fontWeight: isSelected ? 600 : 500, color: isSelected ? ui.accent : ui.muted }}>
                     {a.label}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 2 }}>
