@@ -72,7 +72,7 @@ export function TitleBar({ onSettingsClick, groupColor }: TitleBarProps) {
         <TitleButton onClick={() => win.minimize()} title="最小化">
           <Minus size={15} />
         </TitleButton>
-        <TitleButton onClick={() => win.close()} title="关闭" danger>
+        <TitleButton onClick={() => win.hide()} title="关闭窗口（后台继续运行）" danger>
           <X size={15} />
         </TitleButton>
       </div>

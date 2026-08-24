@@ -12,6 +12,7 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "iamnote",
         "width": 620,
         "height": 820,

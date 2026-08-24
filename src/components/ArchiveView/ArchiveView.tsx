@@ -5,8 +5,9 @@ import { useArchiveStore } from "../../store/archiveStore";
 import { useTaskStore } from "../../store/taskStore";
 import { useGroupStore } from "../../store/groupStore";
 import { useSettingsStore } from "../../store/settingsStore";
-import { ArchivedTask, ArchiveMonth, toYearMonth } from "../../types";
+import { ArchivedTask, ArchiveMonth, isEnded, toYearMonth } from "../../types";
 import { HoverPreview } from "../TaskList/FloatDetailPanel";
+import { useStickyPreview } from "../../lib/useStickyPreview";
 
 // ── Excel 导出工具 ───────────────────────────────────────────
 function fmtDate(iso: string | null) {
@@ -20,6 +21,7 @@ function tasksToRows(tasks: ArchivedTask[], includeMonth = false) {
     const base: Record<string, string> = {
       "任务标题": t.title,
       "分组": t.groupName,
+      "状态": t.status === "cancelled" ? "已取消" : "已完成",
       "创建时间": fmtDate(t.createdAt),
       "完成时间": fmtDate(t.completedAt),
       "归档时间": fmtDate(t.archivedAt),
@@ -51,6 +53,7 @@ function setColWidths(ws: XLSX.WorkSheet) {
   ws["!cols"] = [
     { wch: 36 }, // 任务标题
     { wch: 14 }, // 分组
+    { wch: 10 }, // 状态
     { wch: 18 }, // 创建时间
     { wch: 18 }, // 完成时间
     { wch: 18 }, // 归档时间
@@ -63,30 +66,10 @@ function setColWidths(ws: XLSX.WorkSheet) {
 function ArchivedTaskRow({ task }: { task: ArchivedTask }) {
   const [expanded, setExpanded] = useState(false);
   const rowRef = useRef<HTMLDivElement>(null);
-  const [previewRect, setPreviewRect] = useState<DOMRect | null>(null);
-  const showTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const hasDetail = !!task.detail?.trim();
-
-  const showPreview = () => {
-    if (!hasDetail) return;
-    clearTimeout(dismissTimerRef.current!);
-    showTimerRef.current = setTimeout(() => {
-      const rect = rowRef.current?.getBoundingClientRect();
-      if (rect) setPreviewRect(rect);
-    }, 300);
-  };
-  const scheduleHide = () => {
-    clearTimeout(showTimerRef.current!);
-    dismissTimerRef.current = setTimeout(() => setPreviewRect(null), 150);
-  };
-  const cancelHide = () => clearTimeout(dismissTimerRef.current!);
-  const hidePreview = () => {
-    clearTimeout(showTimerRef.current!);
-    clearTimeout(dismissTimerRef.current!);
-    setPreviewRect(null);
-  };
+  const { anchorRect: previewRect, scheduleShow, scheduleHide, keepOpen, hide: hidePreview } =
+    useStickyPreview(hasDetail);
+  const cancelled = task.status === "cancelled";
 
   function fmt(iso: string | null) {
     if (!iso) return null;
@@ -106,7 +89,7 @@ function ArchivedTaskRow({ task }: { task: ArchivedTask }) {
         onClick={() => setExpanded((v) => !v)}
         onMouseEnter={(e) => {
           (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.02)";
-          showPreview();
+          scheduleShow(rowRef.current);
         }}
         onMouseLeave={(e) => {
           (e.currentTarget as HTMLElement).style.background = "transparent";
@@ -117,11 +100,19 @@ function ArchivedTaskRow({ task }: { task: ArchivedTask }) {
           {/* 完成勾 */}
           <div style={{
             width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
-            backgroundColor: task.groupColor, display: "flex", alignItems: "center", justifyContent: "center",
+            backgroundColor: cancelled ? "#F3F4F6" : task.groupColor,
+            border: cancelled ? "2px solid #9CA3AF" : "none",
+            display: "flex", alignItems: "center", justifyContent: "center",
           }}>
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-              <path d="M1.5 5L4 7.5L8.5 2.5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            {cancelled ? (
+              <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
+                <path d="M1.5 1.5L7.5 7.5M7.5 1.5L1.5 7.5" stroke="#9CA3AF" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            ) : (
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path d="M1.5 5L4 7.5L8.5 2.5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
           </div>
 
           <span style={{
@@ -160,7 +151,9 @@ function ArchivedTaskRow({ task }: { task: ArchivedTask }) {
           <div style={{ marginTop: 6, marginLeft: 30, display: "flex", gap: 16 }}>
             <span style={{ fontSize: 11, color: "#C4C4C4" }}>创建 {fmt(task.createdAt)}</span>
             {task.completedAt && (
-              <span style={{ fontSize: 11, color: "#86EFAC" }}>完成 {fmt(task.completedAt)}</span>
+              <span style={{ fontSize: 11, color: cancelled ? "#9CA3AF" : "#86EFAC" }}>
+                {cancelled ? "取消" : "完成"} {fmt(task.completedAt)}
+              </span>
             )}
             <span style={{ fontSize: 11, color: "#D1B8FF" }}>归档 {fmt(task.archivedAt)}</span>
           </div>
@@ -173,7 +166,8 @@ function ArchivedTaskRow({ task }: { task: ArchivedTask }) {
           accentColor={task.groupColor}
           anchorRect={previewRect}
           content={task.detail}
-          onKeepOpen={cancelHide}
+          onKeepOpen={keepOpen}
+          onMouseLeave={scheduleHide}
           onDismiss={hidePreview}
         />
       )}
@@ -193,7 +187,7 @@ export function ArchiveView({ onArchiveNow, archiving }: ArchiveViewProps) {
   const { groups } = useGroupStore();
   useSettingsStore(); // 确保 settings 已加载
 
-  const doneTasks = tasks.filter((t) => t.status === "done");
+  const doneTasks = tasks.filter((t) => isEnded(t.status));
   const currentArchive = getSelectedArchive();
 
   // 按分组聚合当前月任务
@@ -306,7 +300,7 @@ export function ArchiveView({ onArchiveNow, archiving }: ArchiveViewProps) {
           <p style={{ fontSize: 15, fontWeight: 600, color: "#999", marginBottom: 6 }}>暂无归档记录</p>
           <p style={{ fontSize: 13, color: "#bbb" }}>
             {doneTasks.length > 0
-              ? `点击「手动归档」可将 ${doneTasks.length} 个已完成任务归档`
+              ? `点击「手动归档」可将 ${doneTasks.length} 个已结束任务归档`
               : "每月1日自动归档，或点击「手动归档」立即归档"}
           </p>
         </div>

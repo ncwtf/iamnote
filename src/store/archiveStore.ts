@@ -48,6 +48,7 @@ export const useArchiveStore = create<ArchiveState>((set, get) => ({
         createdAt: t.createdAt,
         completedAt: t.completedAt,
         archivedAt: now,
+        status: t.status === "cancelled" ? "cancelled" : "done",
       };
     });
 

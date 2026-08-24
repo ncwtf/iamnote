@@ -51,6 +51,8 @@ export interface ArchivedTask {
   createdAt: string;
   completedAt: string | null;
   archivedAt: string;
+  /** 结束状态；旧数据缺省视为 done */
+  status?: "done" | "cancelled";
 }
 
 export interface ArchiveMonth {
@@ -86,6 +88,11 @@ export const STATUS_COLORS: Record<Task["status"], string> = {
 };
 
 export const STATUS_CYCLE: Task["status"][] = ["todo", "in-progress", "done"];
+
+/** 完成 / 取消：沉底、记结束时间、可归档 */
+export function isEnded(status: Task["status"]): boolean {
+  return status === "done" || status === "cancelled";
+}
 
 export const GROUP_COLORS = [
   "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6",

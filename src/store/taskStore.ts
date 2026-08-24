@@ -12,12 +12,20 @@ interface TaskState {
   deleteTask: (id: string) => void;
   cycleStatus: (id: string) => void;
   reverseCycleStatus: (id: string) => void;
+  setTaskStatus: (id: string, status: Task["status"]) => void;
+  completeTask: (id: string) => void;
+  cancelTask: (id: string) => void;
   togglePin: (id: string) => void;
   toggleFavorite: (id: string) => void;
+  reorderTasks: (orderedIds: string[]) => void;
   getGroupTasks: (groupId: string) => Task[];
   getFavoritedTasks: () => Task[];
   getAllTasksSorted: () => Task[];
   replaceAll: (tasks: Task[]) => Promise<void>;
+}
+
+function persist(tasks: Task[]) {
+  storageSet("tasks", tasks);
 }
 
 export const useTaskStore = create<TaskState>((set, get) => ({
@@ -54,58 +62,104 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     };
     const updated = [...tasks, newTask];
     set({ tasks: updated });
-    storageSet("tasks", updated);
+    persist(updated);
   },
 
   updateTask: (id, patch) => {
     const updated = get().tasks.map((t) => (t.id === id ? { ...t, ...patch } : t));
     set({ tasks: updated });
-    storageSet("tasks", updated);
+    persist(updated);
   },
 
   deleteTask: (id) => {
     const updated = get().tasks.filter((t) => t.id !== id);
     set({ tasks: updated });
-    storageSet("tasks", updated);
+    persist(updated);
+  },
+
+  completeTask: (id) => {
+    const { tasks } = get();
+    const task = tasks.find((t) => t.id === id);
+    if (!task) return;
+    const now = new Date().toISOString();
+
+    if (task.recurringEnabled) {
+      const nextCount = task.recurringCount + 1;
+      const snapshot: Task = {
+        ...task,
+        ...TASK_META_DEFAULTS,
+        id: uuidv4(),
+        title: task.title,
+        detail: task.detail,
+        groupId: task.groupId,
+        status: "done",
+        pinned: false,
+        favorited: false,
+        order: tasks.length,
+        createdAt: task.createdAt,
+        completedAt: now,
+        recurringEnabled: false,
+        recurringCount: nextCount,
+      };
+      const patch: Partial<Task> = {
+        status: "todo",
+        completedAt: now,
+        recurringCount: nextCount,
+      };
+      if (task.periodicEnabled) {
+        patch.nextDueAt = calcNextDue(
+          new Date(),
+          task.periodicType,
+          task.periodicInterval
+        ).toISOString();
+        patch.reminderAt = patch.nextDueAt;
+        patch.reminderFired = false;
+      }
+      const updated = [
+        ...tasks.map((t) => (t.id === id ? { ...t, ...patch } : t)),
+        snapshot,
+      ];
+      set({ tasks: updated });
+      persist(updated);
+      return;
+    }
+
+    if (task.status === "done") return;
+    const updated = tasks.map((t) =>
+      t.id === id ? { ...t, status: "done" as const, completedAt: now } : t
+    );
+    set({ tasks: updated });
+    persist(updated);
+  },
+
+  cancelTask: (id) => {
+    const task = get().tasks.find((t) => t.id === id);
+    if (!task || task.status === "cancelled") return;
+    get().updateTask(id, { status: "cancelled", completedAt: new Date().toISOString() });
+  },
+
+  setTaskStatus: (id, status) => {
+    if (status === "done") {
+      get().completeTask(id);
+      return;
+    }
+    if (status === "cancelled") {
+      get().cancelTask(id);
+      return;
+    }
+    get().updateTask(id, { status });
   },
 
   cycleStatus: (id) => {
     const task = get().tasks.find((t) => t.id === id);
     if (!task) return;
-    // cancelled 左键直接回到 todo；否则在3态中循环
     if (task.status === "cancelled") {
       get().updateTask(id, { status: "todo" });
       return;
     }
     const currentIndex = STATUS_CYCLE.indexOf(task.status);
     const nextStatus = STATUS_CYCLE[(currentIndex + 1) % STATUS_CYCLE.length];
-
-    if (nextStatus === "done") {
-      if (task.recurringEnabled) {
-        // 循环计数：完成次数 +1，重置回 todo
-        const patch: Partial<Task> = {
-          status: "todo",
-          completedAt: new Date().toISOString(),
-          recurringCount: task.recurringCount + 1,
-        };
-        // 周期循环：同时更新下次到期时间
-        if (task.periodicEnabled) {
-          patch.nextDueAt = calcNextDue(
-            new Date(),
-            task.periodicType,
-            task.periodicInterval
-          ).toISOString();
-          patch.reminderAt = patch.nextDueAt;
-          patch.reminderFired = false;
-        }
-        get().updateTask(id, patch);
-        return;
-      }
-      // 普通任务完成
-      get().updateTask(id, { status: "done", completedAt: new Date().toISOString() });
-    } else {
-      get().updateTask(id, { status: nextStatus });
-    }
+    get().setTaskStatus(id, nextStatus);
   },
 
   reverseCycleStatus: (id) => {
@@ -113,9 +167,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     if (!task) return;
     const currentIndex = STATUS_CYCLE.indexOf(task.status);
     const prevStatus = STATUS_CYCLE[(currentIndex - 1 + STATUS_CYCLE.length) % STATUS_CYCLE.length];
-    const patch: Partial<Task> = { status: prevStatus };
-    if (prevStatus === "done") patch.completedAt = new Date().toISOString();
-    get().updateTask(id, patch);
+    get().setTaskStatus(id, prevStatus);
   },
 
   togglePin: (id) => {
@@ -128,6 +180,15 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     const task = get().tasks.find((t) => t.id === id);
     if (!task) return;
     get().updateTask(id, { favorited: !task.favorited });
+  },
+
+  reorderTasks: (orderedIds) => {
+    const rank = new Map(orderedIds.map((id, i) => [id, i]));
+    const updated = get().tasks.map((t) =>
+      rank.has(t.id) ? { ...t, order: rank.get(t.id)! } : t
+    );
+    set({ tasks: updated });
+    persist(updated);
   },
 
   getGroupTasks: (groupId) => {

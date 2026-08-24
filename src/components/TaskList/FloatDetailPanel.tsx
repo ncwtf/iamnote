@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { X, GripHorizontal } from "lucide-react";
 import ReactMarkdown from "react-markdown";
@@ -161,63 +161,67 @@ export function FloatDetailPanel({ task, accentColor, anchorRect, onClose }: Flo
 }
 
 // ─────────────────────────────────────────────────────────
-// 2. 悬停触发的只读预览气泡
+// 2. 悬停触发的只读预览气泡（失焦才关，宽度对齐任务区）
 // ─────────────────────────────────────────────────────────
-const PREVIEW_MAX_H = 340;
-const PREVIEW_W     = 360;
+const PREVIEW_GAP = 8;
+const PREVIEW_EDGE = 8;
 
 interface HoverPreviewProps {
   accentColor: string;
   anchorRect: DOMRect;
   content: string;
-  /** 鼠标移入气泡时调用（取消关闭计时器） */
   onKeepOpen: () => void;
-  /** 鼠标移出气泡时调用（触发关闭） */
+  /** 鼠标离开预览（可带缓冲） */
+  onMouseLeave: () => void;
+  /** Esc / 窗口失焦 / 滚动：立刻关 */
   onDismiss: () => void;
 }
 
 export function HoverPreview({
-  accentColor, anchorRect, content, onKeepOpen, onDismiss,
+  accentColor, anchorRect, content, onKeepOpen, onMouseLeave, onDismiss,
 }: HoverPreviewProps) {
-  const contentRef = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState<{ left: number; top: number; above: boolean } | null>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
 
-  // 计算位置：优先显示在下方，空间不足时翻转到上方
   useEffect(() => {
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onDismiss();
+    };
+    const onScroll = () => onDismiss();
+    const onBlur = () => onDismiss();
+    window.addEventListener("keydown", onKey, true);
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("keydown", onKey, true);
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("blur", onBlur);
+    };
+  }, [onDismiss]);
 
-    let left = anchorRect.left + 32;
-    if (left + PREVIEW_W > vw - 8) left = vw - PREVIEW_W - 8;
-    if (left < 8) left = 8;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const width = Math.max(240, Math.min(anchorRect.width, vw - PREVIEW_EDGE * 2));
+  let left = anchorRect.left;
+  if (left + width > vw - PREVIEW_EDGE) left = vw - width - PREVIEW_EDGE;
+  if (left < PREVIEW_EDGE) left = PREVIEW_EDGE;
 
-    const spaceBelow = vh - anchorRect.bottom - 8;
-    const spaceAbove = anchorRect.top - 8;
-    const above = spaceBelow < 160 && spaceAbove > spaceBelow;
+  const spaceBelow = vh - anchorRect.bottom - PREVIEW_GAP - PREVIEW_EDGE;
+  const spaceAbove = anchorRect.top - PREVIEW_GAP - PREVIEW_EDGE;
+  const above = spaceBelow < 200 && spaceAbove > spaceBelow;
+  const maxH = Math.max(80, Math.min(Math.floor(vh * 0.72), above ? spaceAbove : spaceBelow));
 
-    const top = above
-      ? anchorRect.top - Math.min(PREVIEW_MAX_H, spaceAbove) - 4
-      : anchorRect.bottom + 4;
-
-    setPos({ left, top, above });
-  }, [anchorRect]);
-
-  if (!pos) return null;
-
-  const maxH = pos.above
-    ? Math.min(PREVIEW_MAX_H, anchorRect.top - 12)
-    : Math.min(PREVIEW_MAX_H, window.innerHeight - pos.top - 8);
+  const posStyle: CSSProperties = above
+    ? { left, width, bottom: vh - anchorRect.top + PREVIEW_GAP, top: "auto", maxHeight: maxH }
+    : { left, width, top: anchorRect.bottom + PREVIEW_GAP, maxHeight: maxH };
 
   return createPortal(
     <div
+      ref={boxRef}
       onMouseEnter={onKeepOpen}
-      onMouseLeave={onDismiss}
+      onMouseLeave={onMouseLeave}
       style={{
         position: "fixed",
-        left: pos.left,
-        top: pos.top,
-        width: PREVIEW_W,
-        maxHeight: maxH,
+        ...posStyle,
         zIndex: 8500,
         borderRadius: 10,
         border: `1px solid ${accentColor}30`,
@@ -226,10 +230,9 @@ export function HoverPreview({
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
-        animation: "hoverPreviewIn 0.15s ease",
+        animation: above ? "hoverPreviewInUp 0.15s ease" : "hoverPreviewIn 0.15s ease",
       }}
     >
-      {/* 标题条 */}
       <div style={{
         padding: "5px 12px 4px",
         background: `${accentColor}0d`,
@@ -244,15 +247,13 @@ export function HoverPreview({
         PREVIEW
       </div>
 
-      {/* 内容区：可滚动 */}
       <div
-        ref={contentRef}
         className="md-content github-md"
         style={{
           flex: 1,
           overflowY: "auto",
-          padding: "10px 14px 12px",
-          fontSize: 13,
+          padding: "12px 16px 14px",
+          fontSize: 14,
           lineHeight: 1.7,
           color: "#24292f",
         }}

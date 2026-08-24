@@ -1,8 +1,25 @@
 import { useState, useRef, useEffect } from "react";
 import { Plus, ChevronDown, ChevronRight } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+  sortableKeyboardCoordinates,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useTaskStore } from "../../store/taskStore";
 import { TaskItem } from "./TaskItem";
-import { Group } from "../../types";
+import { Group, Task, isEnded } from "../../types";
 
 interface TaskListProps {
   group: Group;
@@ -10,7 +27,7 @@ interface TaskListProps {
 }
 
 export function TaskList({ group, addTriggerRef }: TaskListProps) {
-  const { getGroupTasks, addTask } = useTaskStore();
+  const { getGroupTasks, addTask, reorderTasks } = useTaskStore();
   const [isAdding, setIsAdding] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [doneExpanded, setDoneExpanded] = useState(true);
@@ -18,7 +35,6 @@ export function TaskList({ group, addTriggerRef }: TaskListProps) {
 
   const allTasks = getGroupTasks(group.id);
 
-  // 暴露触发添加的方法，供父组件（快捷键）调用
   useEffect(() => {
     if (addTriggerRef) {
       addTriggerRef.current = () => {
@@ -44,14 +60,17 @@ export function TaskList({ group, addTriggerRef }: TaskListProps) {
     }
   };
 
-  const pinnedTasks = allTasks.filter((t) => t.pinned && t.status !== "done");
-  const activeTasks = allTasks.filter((t) => !t.pinned && t.status !== "done");
-  const doneTasks = allTasks.filter((t) => t.status === "done");
+  const pinnedTasks = allTasks.filter((t) => t.pinned && !isEnded(t.status));
+  const activeTasks = allTasks.filter((t) => !t.pinned && !isEnded(t.status));
+  const endedTasks = allTasks
+    .filter((t) => isEnded(t.status))
+    .slice()
+    .sort((a, b) => (b.completedAt ?? b.createdAt).localeCompare(a.completedAt ?? a.createdAt));
   const activeCount = pinnedTasks.length + activeTasks.length;
+  const cancelledCount = endedTasks.filter((t) => t.status === "cancelled").length;
 
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: "#FAFAF8" }}>
-      {/* 顶部栏 */}
       <div
         style={{
           display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -91,9 +110,7 @@ export function TaskList({ group, addTriggerRef }: TaskListProps) {
         </button>
       </div>
 
-      {/* 内容区 */}
       <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column" }}>
-        {/* 新建输入 */}
         {isAdding && (
           <div
             style={{
@@ -120,7 +137,6 @@ export function TaskList({ group, addTriggerRef }: TaskListProps) {
           </div>
         )}
 
-        {/* 空状态 */}
         {allTasks.length === 0 && !isAdding && (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, padding: 40, textAlign: "center" }}>
             <div style={{ width: 48, height: 48, borderRadius: "50%", backgroundColor: `${group.color}20`, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 16 }}>
@@ -137,30 +153,31 @@ export function TaskList({ group, addTriggerRef }: TaskListProps) {
           </div>
         )}
 
-        {/* 置顶任务 */}
         {pinnedTasks.length > 0 && (
           <div>
             <SectionLabel label="📌 置顶" />
-            {pinnedTasks.map((task) => (
-              <TaskItem key={task.id} task={task} accentColor={group.color} />
-            ))}
+            <SortableTaskSection
+              tasks={pinnedTasks}
+              accentColor={group.color}
+              onReorder={reorderTasks}
+            />
           </div>
         )}
 
-        {/* 普通任务 */}
         {activeTasks.length > 0 && (
           <div>
             {pinnedTasks.length > 0 && <SectionLabel label="任务" />}
-            {activeTasks.map((task) => (
-              <TaskItem key={task.id} task={task} accentColor={group.color} />
-            ))}
+            <SortableTaskSection
+              tasks={activeTasks}
+              accentColor={group.color}
+              onReorder={reorderTasks}
+            />
           </div>
         )}
 
         <div style={{ flex: 1 }} />
 
-        {/* 已完成区域 */}
-        {doneTasks.length > 0 && (
+        {endedTasks.length > 0 && (
           <div style={{ borderTop: "1px solid rgba(0,0,0,0.06)", background: "#fff", flexShrink: 0 }}>
             <button
               onClick={() => setDoneExpanded(!doneExpanded)}
@@ -178,23 +195,86 @@ export function TaskList({ group, addTriggerRef }: TaskListProps) {
                 <circle cx="7" cy="7" r="6" stroke="#10B981" strokeWidth="1.5" />
                 <path d="M4 7L6 9L10 5" stroke="#10B981" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              <span style={{ flex: 1, textAlign: "left" }}>已完成</span>
+              <span style={{ flex: 1, textAlign: "left" }}>
+                {cancelledCount > 0 ? "已结束" : "已完成"}
+              </span>
               <span style={{ background: "#F3F4F6", borderRadius: 8, padding: "1px 7px", fontSize: 11, fontWeight: 600, color: "#aaa", marginRight: 4 }}>
-                {doneTasks.length}
+                {endedTasks.length}
               </span>
               {doneExpanded ? <ChevronDown size={13} color="#bbb" /> : <ChevronRight size={13} color="#bbb" />}
             </button>
 
             {doneExpanded && (
               <div style={{ maxHeight: 220, overflowY: "auto", borderTop: "1px solid rgba(0,0,0,0.04)" }}>
-                {doneTasks.map((task) => (
-                  <TaskItem key={task.id} task={task} accentColor="#10B981" compact />
+                {endedTasks.map((task) => (
+                  <TaskItem
+                    key={task.id}
+                    task={task}
+                    accentColor={task.status === "cancelled" ? "#9CA3AF" : "#10B981"}
+                    compact
+                  />
                 ))}
               </div>
             )}
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function SortableTaskSection({
+  tasks,
+  accentColor,
+  onReorder,
+}: {
+  tasks: Task[];
+  accentColor: string;
+  onReorder: (ids: string[]) => void;
+}) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = tasks.findIndex((t) => t.id === active.id);
+    const newIndex = tasks.findIndex((t) => t.id === over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+    onReorder(arrayMove(tasks, oldIndex, newIndex).map((t) => t.id));
+  };
+
+  return (
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+        {tasks.map((task) => (
+          <SortableTaskItem key={task.id} task={task} accentColor={accentColor} />
+        ))}
+      </SortableContext>
+    </DndContext>
+  );
+}
+
+function SortableTaskItem({ task, accentColor }: { task: Task; accentColor: string }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.55 : 1,
+        zIndex: isDragging ? 20 : undefined,
+        position: "relative",
+      }}
+    >
+      <TaskItem
+        task={task}
+        accentColor={accentColor}
+        dragHandleProps={{ ...attributes, ...listeners }}
+      />
     </div>
   );
 }

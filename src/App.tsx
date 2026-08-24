@@ -10,7 +10,7 @@ import { FavoritesView } from "./components/FavoritesView/FavoritesView";
 import { ArchiveView } from "./components/ArchiveView/ArchiveView";
 import { SettingsPanel } from "./components/SettingsPanel/SettingsPanel";
 import { OverviewView } from "./components/OverviewView/OverviewView";
-import { FAVORITES_GROUP_ID, ARCHIVE_GROUP_ID, OVERVIEW_GROUP_ID, toYearMonth } from "./types";
+import { FAVORITES_GROUP_ID, ARCHIVE_GROUP_ID, OVERVIEW_GROUP_ID, toYearMonth, isEnded } from "./types";
 import { buildShortcutString } from "./lib/shortcut";
 import { writeSyncFile, resolveOnStartup } from "./lib/sync";
 import { invoke } from "@tauri-apps/api/core";
@@ -214,7 +214,7 @@ function App() {
         // 归档到上个月
         const prevMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
         const targetYM = toYearMonth(prevMonth);
-        const currentDone = useTaskStore.getState().tasks.filter((t) => t.status === "done");
+        const currentDone = useTaskStore.getState().tasks.filter((t) => isEnded(t.status));
         if (currentDone.length > 0) {
           const archivedIds = await archiveTasks(
             currentDone,
@@ -268,7 +268,7 @@ function App() {
   const handleArchiveNow = async () => {
     setArchiving(true);
     try {
-      const currentDone = tasks.filter((t) => t.status === "done");
+      const currentDone = tasks.filter((t) => isEnded(t.status));
       if (currentDone.length === 0) return;
       const targetYM = toYearMonth(new Date());
       const archivedIds = await archiveTasks(currentDone, groups, targetYM);

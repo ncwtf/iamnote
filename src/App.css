@@ -182,8 +182,60 @@ button { cursor: pointer; }
   border-radius: 4px;
 }
 
+/* 任务列表 checkbox（GFM） */
+.md-content li.task-list-item,
+.md-content li:has(> input[type="checkbox"]) {
+  list-style: none;
+  margin-left: -1.2em;
+}
+.md-content li input[type="checkbox"] {
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  margin: 0 6px 0 0;
+  vertical-align: middle;
+  border: 1px solid #d0d7de;
+  border-radius: 3px;
+  background: #fff;
+  position: relative;
+}
+.md-content li input[type="checkbox"]:checked {
+  background: #0969da;
+  border-color: #0969da;
+}
+.md-content li input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 3.5px;
+  top: 0.5px;
+  width: 4px;
+  height: 7px;
+  border: solid #fff;
+  border-width: 0 1.6px 1.6px 0;
+  transform: rotate(45deg);
+}
+
+/* kbd */
+.md-content kbd {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace;
+  font-size: 11px;
+  padding: 2px 5px;
+  background: #f6f8fa;
+  border: 1px solid #d0d7de;
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  color: #1f2328;
+}
+
+.md-content > :first-child { margin-top: 0; }
+.md-content > :last-child { margin-bottom: 0; }
+
 /* 悬浮预览入场动画 */
 @keyframes hoverPreviewIn {
   from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes hoverPreviewInUp {
+  from { opacity: 0; transform: translateY(-4px); }
   to   { opacity: 1; transform: translateY(0); }
 }

@@ -4,13 +4,14 @@ import { useGroupStore } from "../../store/groupStore";
 import { TaskItem } from "../TaskList/TaskItem";
 import { Task } from "../../types";
 
-type Filter = "all" | "todo" | "in-progress" | "done";
+type Filter = "all" | "todo" | "in-progress" | "done" | "cancelled";
 
 const FILTERS: { key: Filter; label: string; color: string }[] = [
   { key: "all",         label: "全部",   color: "#6B7280" },
   { key: "todo",        label: "待办",   color: "#9CA3AF" },
   { key: "in-progress", label: "进行中", color: "#F59E0B" },
   { key: "done",        label: "已完成", color: "#10B981" },
+  { key: "cancelled",   label: "已取消", color: "#9CA3AF" },
 ];
 
 export function OverviewView() {
@@ -43,6 +44,7 @@ export function OverviewView() {
     todo:         allTasks.filter((t) => t.status === "todo").length,
     "in-progress": allTasks.filter((t) => t.status === "in-progress").length,
     done:         allTasks.filter((t) => t.status === "done").length,
+    cancelled:    allTasks.filter((t) => t.status === "cancelled").length,
   };
 
   return (

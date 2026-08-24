@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect, forwardRef } from "react";
 import { createPortal } from "react-dom";
-import { Pin, Trash2, Pencil, Star, FileText, ChevronRight, Settings2, Bell, RotateCcw, CalendarClock } from "lucide-react";
-import { Task } from "../../types";
+import { Pin, Trash2, Pencil, Star, FileText, ChevronRight, Settings2, Bell, RotateCcw, CalendarClock, GripVertical } from "lucide-react";
+import { isEnded, Task } from "../../types";
 import { useTaskStore } from "../../store/taskStore";
+import { useStickyPreview } from "../../lib/useStickyPreview";
 import { FloatDetailPanel, HoverPreview } from "./FloatDetailPanel";
 import { TaskOptionsPanel } from "./TaskOptionsPanel";
 
@@ -11,6 +12,7 @@ interface TaskItemProps {
   accentColor: string;
   compact?: boolean;
   groupBadge?: { name: string; color: string };
+  dragHandleProps?: React.HTMLAttributes<HTMLElement>;
 }
 
 // ── 时间格式化 ────────────────────────────────────────────
@@ -161,8 +163,8 @@ function StatusDot({ status, accentColor, onClick, onContextMenuOpen }: {
 }
 
 // ── 任务项主体 ────────────────────────────────────────────
-export function TaskItem({ task, accentColor, compact = false, groupBadge }: TaskItemProps) {
-  const { cycleStatus, togglePin, toggleFavorite, deleteTask, updateTask } = useTaskStore();
+export function TaskItem({ task, accentColor, compact = false, groupBadge, dragHandleProps }: TaskItemProps) {
+  const { cycleStatus, togglePin, toggleFavorite, deleteTask, updateTask, setTaskStatus } = useTaskStore();
   const [pickerRect, setPickerRect] = useState<DOMRect | null>(null);
 
   // 标题编辑
@@ -181,37 +183,10 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge }: Tas
   // hover（操作按钮显隐）
   const [hovered, setHovered] = useState(false);
 
-  // 悬停预览气泡
   const taskRef = useRef<HTMLDivElement>(null);
-  const [previewRect, setPreviewRect] = useState<DOMRect | null>(null);
-  const showTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const showPreview = () => {
-    if (!task.detail?.trim()) return;
-    clearTimeout(dismissTimerRef.current!);
-    showTimerRef.current = setTimeout(() => {
-      const rect = taskRef.current?.getBoundingClientRect();
-      if (rect) setPreviewRect(rect);
-    }, 300);
-  };
-
-  /** 鼠标离开任务行时，给 150ms 缓冲让鼠标移入气泡 */
-  const scheduleHide = () => {
-    clearTimeout(showTimerRef.current!);
-    dismissTimerRef.current = setTimeout(() => setPreviewRect(null), 150);
-  };
-
-  /** 鼠标移入气泡时取消关闭 */
-  const cancelHide = () => {
-    clearTimeout(dismissTimerRef.current!);
-  };
-
-  const hidePreview = () => {
-    clearTimeout(showTimerRef.current!);
-    clearTimeout(dismissTimerRef.current!);
-    setPreviewRect(null);
-  };
+  const hasDetail = !!(task.detail?.trim());
+  const { anchorRect: previewRect, scheduleShow, scheduleHide, keepOpen, hide: hidePreview } =
+    useStickyPreview(hasDetail);
 
   // 点击触发的编辑浮窗
   const [editAnchor, setEditAnchor] = useState<DOMRect | null>(null);
@@ -233,8 +208,7 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge }: Tas
     if (rect) setOptionsAnchor(rect);
   };
 
-  const hasDetail = !!(task.detail?.trim());
-  const isDone = task.status === "done";
+  const ended = isEnded(task.status);
   const py = compact ? 6 : 10;
 
   // meta 指示器
@@ -246,7 +220,7 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge }: Tas
     <>
       <div
         ref={taskRef}
-        onMouseEnter={() => { setHovered(true); showPreview(); }}
+        onMouseEnter={() => { setHovered(true); scheduleShow(taskRef.current); }}
         onMouseLeave={() => { setHovered(false); scheduleHide(); }}
         style={{
           borderBottom: "1px solid rgba(0,0,0,0.05)",
@@ -254,7 +228,27 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge }: Tas
           transition: "background 0.12s",
         }}
       >
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: `${py}px 14px` }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: `${py}px 14px` }}>
+          {dragHandleProps && (
+            <button
+              {...dragHandleProps}
+              title="拖动排序"
+              tabIndex={-1}
+              onPointerDown={(e) => {
+                hidePreview();
+                dragHandleProps.onPointerDown?.(e);
+              }}
+              style={{
+                width: 16, height: 22, flexShrink: 0, paddingTop: 2,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "#C4C4C4", cursor: "grab", touchAction: "none",
+                opacity: hovered ? 1 : 0,
+                transition: "opacity 0.12s",
+              }}
+            >
+              <GripVertical size={14} />
+            </button>
+          )}
           {/* 状态点 */}
           <div style={{ paddingTop: 2, flexShrink: 0 }}>
             <StatusDot
@@ -311,8 +305,8 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge }: Tas
                   style={{
                     flex: 1, minWidth: 0, display: "block",
                     fontSize: 14, lineHeight: 1.4,
-                    color: isDone ? "#B0B0B0" : "#1c1c1e",
-                    textDecoration: isDone ? "line-through" : "none",
+                    color: ended ? "#B0B0B0" : "#1c1c1e",
+                    textDecoration: ended ? "line-through" : "none",
                     textDecorationColor: "#C0C0C0",
                     cursor: "text",
                     overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
@@ -332,6 +326,9 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge }: Tas
               )}
               {!compact && task.status === "in-progress" && (
                 <span style={{ fontSize: 11, fontWeight: 600, color: "#D97706", background: "#FFF8E8", borderRadius: 4, padding: "1px 6px" }}>进行中</span>
+              )}
+              {task.status === "cancelled" && (
+                <span style={{ fontSize: 11, fontWeight: 600, color: "#6B7280", background: "#F3F4F6", borderRadius: 4, padding: "1px 6px" }}>已取消</span>
               )}
               {!compact && task.pinned && (
                 <span style={{ fontSize: 11, fontWeight: 600, color: "#3B82F6", background: "#EFF6FF", borderRadius: 4, padding: "1px 6px" }}>置顶</span>
@@ -358,8 +355,11 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge }: Tas
             {!compact && (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 3, paddingLeft: 17 }}>
                 <span style={{ fontSize: 11, color: "#C4C4C4" }}>创建 {fmt(task.createdAt)}</span>
-                {task.completedAt && (
+                {task.completedAt && task.status === "done" && (
                   <span style={{ fontSize: 11, color: "#86EFAC" }}>完成 {fmt(task.completedAt)}</span>
+                )}
+                {task.completedAt && task.status === "cancelled" && (
+                  <span style={{ fontSize: 11, color: "#9CA3AF" }}>取消 {fmt(task.completedAt)}</span>
                 )}
               </div>
             )}
@@ -436,7 +436,8 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge }: Tas
           accentColor={accentColor}
           anchorRect={previewRect}
           content={task.detail}
-          onKeepOpen={cancelHide}
+          onKeepOpen={keepOpen}
+          onMouseLeave={scheduleHide}
           onDismiss={hidePreview}
         />
       )}
@@ -467,19 +468,7 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge }: Tas
           current={task.status}
           accentColor={accentColor}
           onSelect={(s) => {
-            if (s === "cancelled") {
-              updateTask(task.id, { status: "cancelled" });
-            } else if (s === task.status) {
-              // 点当前状态不做任何操作
-            } else {
-              // done/todo/in-progress 都走 cycleStatus 的完整路径
-              // 但因为可能是跨状态跳转，直接 updateTask 更精确
-              if (s === "done") {
-                updateTask(task.id, { status: "done", completedAt: new Date().toISOString() });
-              } else {
-                updateTask(task.id, { status: s });
-              }
-            }
+            if (s !== task.status) setTaskStatus(task.id, s);
           }}
           onClose={() => setPickerRect(null)}
         />
