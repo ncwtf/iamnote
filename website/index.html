@@ -929,12 +929,26 @@
       els.forEach((el) => observer.observe(el));
     }
 
+    function parseVer(tag) {
+      const m = String(tag || "").replace(/^v/i, "").match(/^(\d+)\.(\d+)\.(\d+)/);
+      return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+    }
+    function newerThan(a, b) {
+      const x = parseVer(a), y = parseVer(b);
+      if (!x) return false;
+      if (!y) return true;
+      for (let i = 0; i < 3; i++) {
+        if (x[i] !== y[i]) return x[i] > y[i];
+      }
+      return false;
+    }
+
     fetch("https://api.github.com/repos/ncwtf/iamnote/releases/latest")
       .then((r) => r.ok ? r.json() : null)
       .then((data) => {
         if (!data || !data.tag_name) return;
         document.querySelectorAll("[data-version]").forEach((el) => {
-          el.textContent = data.tag_name;
+          if (newerThan(data.tag_name, el.textContent)) el.textContent = data.tag_name;
         });
       })
       .catch(() => {});
