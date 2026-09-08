@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
-import { X, Pin, Power, Keyboard, Eye, Download, Upload, CheckCircle, AlertCircle, Cloud, FolderOpen, RefreshCw, Image as ImageIcon } from "lucide-react";
+import { X, Pin, Power, Keyboard, Eye, Download, Upload, CheckCircle, AlertCircle, Cloud, FolderOpen, RefreshCw, Image as ImageIcon, ArrowUpCircle } from "lucide-react";
 import { useSettingsStore } from "../../store/settingsStore";
 import { useGroupStore } from "../../store/groupStore";
 import { useTaskStore } from "../../store/taskStore";
@@ -10,6 +10,8 @@ import { exportBackup, importBackup } from "../../lib/importExport";
 import { pickSyncFolder, writeSyncFile } from "../../lib/sync";
 import { ui } from "../../theme";
 import { fileToWallpaperDataUrl } from "../../lib/wallpaper";
+import { checkGithubUpdate, type UpdateInfo } from "../../lib/githubUpdate";
+import { UpdateDialog } from "../UpdateDialog";
 
 interface SettingsPanelProps {
   onClose: () => void;
@@ -657,14 +659,75 @@ function SyncSection() {
   );
 }
 
+function UpdateSection({
+  onFound,
+}: {
+  onFound: (info: UpdateInfo) => void;
+}) {
+  const { settings, setAutoCheckUpdate } = useSettingsStore();
+  const [checking, setChecking] = useState(false);
+  const [status, setStatus] = useState("");
+
+  const handleCheck = async () => {
+    setChecking(true);
+    setStatus("");
+    try {
+      const info = await checkGithubUpdate();
+      if (info) {
+        setStatus(`发现新版本 v${info.version}`);
+        onFound(info);
+      } else {
+        setStatus("已是最新版本");
+      }
+    } catch {
+      setStatus("检查失败，请确认能访问 GitHub");
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  return (
+    <div style={{ padding: "4px 0 10px", borderBottom: "1px solid rgba(0,0,0,0.06)" }}>
+      <ToggleRow
+        icon={<ArrowUpCircle size={16} />}
+        label="启动时检查更新"
+        desc="启动后从 GitHub Releases 检查新版本"
+        checked={settings.autoCheckUpdate}
+        onChange={setAutoCheckUpdate}
+        color="#3B82F6"
+      />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0 4px" }}>
+        <p style={{ fontSize: 12, color: ui.muted, lineHeight: 1.5 }}>
+          {status || "安装包来自 GitHub Releases，按当前系统自动挑选"}
+        </p>
+        <button
+          onClick={() => { void handleCheck(); }}
+          disabled={checking}
+          style={{
+            display: "flex", alignItems: "center", gap: 6, flexShrink: 0, marginLeft: 12,
+            height: 28, padding: "0 10px", borderRadius: 8, fontSize: 12, fontWeight: 600,
+            background: "#EFF6FF", color: "#2563EB", border: "1px solid #BFDBFE",
+            opacity: checking ? 0.6 : 1,
+          }}
+        >
+          <RefreshCw size={12} style={{ animation: checking ? "spin 1s linear infinite" : "none" }} />
+          {checking ? "检查中…" : "检查更新"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── 主面板 ─────────────────────────────────────────────────
 export function SettingsPanel({ onClose }: SettingsPanelProps) {
   const {
     settings,
     setAlwaysOnTop, setAutoStart, setWallpaper,
     setShortcutAddTask, setShortcutToggleWindow,
+    setSkippedUpdateTag,
   } = useSettingsStore();
   const [appVersion, setAppVersion] = useState("");
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   useEffect(() => { getVersion().then(setAppVersion).catch(() => setAppVersion("0.1.0")); }, []);
 
   // Esc 关闭设置面板（不在录制快捷键时）
@@ -702,6 +765,16 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
         </button>
       </div>
 
+      {updateInfo && (
+        <UpdateDialog
+          info={updateInfo}
+          onLater={() => {
+            void setSkippedUpdateTag(updateInfo.version);
+            setUpdateInfo(null);
+          }}
+        />
+      )}
+
       {/* 内容 */}
       <div style={{ flex: 1, overflowY: "auto", padding: "0 20px" }}>
         {/* 通用 */}
@@ -722,6 +795,9 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
           onChange={setAutoStart}
           color="#10B981"
         />
+
+        <SectionTitle>更新</SectionTitle>
+        <UpdateSection onFound={setUpdateInfo} />
 
         <SectionTitle>背景图片</SectionTitle>
         <WallpaperSection

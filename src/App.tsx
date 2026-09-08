@@ -9,6 +9,8 @@ import { TaskList } from "./components/TaskList/TaskList";
 import { FavoritesView } from "./components/FavoritesView/FavoritesView";
 import { ArchiveView } from "./components/ArchiveView/ArchiveView";
 import { SettingsPanel } from "./components/SettingsPanel/SettingsPanel";
+import { UpdateDialog } from "./components/UpdateDialog";
+import { checkGithubUpdate, type UpdateInfo } from "./lib/githubUpdate";
 import { OverviewView } from "./components/OverviewView/OverviewView";
 import { FAVORITES_GROUP_ID, ARCHIVE_GROUP_ID, OVERVIEW_GROUP_ID, toYearMonth, isEnded } from "./types";
 import { buildGroupTheme, SYSTEM_ACCENTS, ui } from "./theme";
@@ -31,11 +33,14 @@ function App() {
   const {
     load: loadSettings, settings,
     updateLastModified, markSynced, markAutoArchived,
+    setSkippedUpdateTag,
   } = useSettingsStore();
   const { load: loadArchives, archiveTasks } = useArchiveStore();
 
   const [showSettings, setShowSettings] = useState(false);
   const [archiving, setArchiving] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const checkedUpdateRef = useRef(false);
 
   // ── 定时提醒（系统通知 + 提示音 + 应用内 Toast） ─────────────
   const { updateTask } = useTaskStore();
@@ -234,6 +239,24 @@ function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settingsLoaded, groupsLoaded, tasksLoaded]);
 
+  // ── 启动时检查 GitHub Releases 更新 ─────────────────────
+  useEffect(() => {
+    if (!settingsLoaded || checkedUpdateRef.current) return;
+    if (!settings.autoCheckUpdate) return;
+    const timer = setTimeout(async () => {
+      checkedUpdateRef.current = true;
+      try {
+        const info = await checkGithubUpdate();
+        if (!info) return;
+        if (useSettingsStore.getState().settings.skippedUpdateTag === info.version) return;
+        setUpdateInfo(info);
+      } catch (e) {
+        console.warn("检查更新失败:", e);
+      }
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, [settingsLoaded, settings.autoCheckUpdate]);
+
   // ── 数据变化时自动同步（防抖 2s） ───────────────────────
   useEffect(() => {
     if (!settingsLoaded || !groupsLoaded || !tasksLoaded) return;
@@ -379,6 +402,16 @@ function App() {
           )}
         </div>
       </div>
+
+      {updateInfo && (
+        <UpdateDialog
+          info={updateInfo}
+          onLater={() => {
+            void setSkippedUpdateTag(updateInfo.version);
+            setUpdateInfo(null);
+          }}
+        />
+      )}
 
       {/* ── 应用内提醒 Toast（系统通知的可视兜底） ── */}
       {reminderToasts.length > 0 && (

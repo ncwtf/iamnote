@@ -23,6 +23,8 @@ interface SettingsState {
   setWallpaper: (patch: Partial<Pick<Settings,
     "wallpaperData" | "wallpaperOpacity" | "wallpaperMask" | "wallpaperBlur" | "wallpaperFit"
   >>) => Promise<void>;
+  setAutoCheckUpdate: (value: boolean) => Promise<void>;
+  setSkippedUpdateTag: (tag: string | null) => Promise<void>;
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -40,6 +42,8 @@ const DEFAULT_SETTINGS: Settings = {
   wallpaperMask: 0.82,
   wallpaperBlur: 0,
   wallpaperFit: "cover",
+  autoCheckUpdate: true,
+  skippedUpdateTag: null,
 };
 
 // 互斥锁：防止快捷键短时间内重复触发导致 hide→show 闪烁
@@ -181,6 +185,18 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     const settings = { ...get().settings, ...patch };
     set({ settings });
     persistWallpaperSoon();
+  },
+
+  setAutoCheckUpdate: async (value) => {
+    const settings = { ...get().settings, autoCheckUpdate: value };
+    set({ settings });
+    await storageSet("settings", settings);
+  },
+
+  setSkippedUpdateTag: async (tag) => {
+    const settings = { ...get().settings, skippedUpdateTag: tag };
+    set({ settings });
+    await storageSet("settings", settings);
   },
 }));
 

@@ -76,6 +76,10 @@ export interface Settings {
   wallpaperMask: number;
   wallpaperBlur: number;
   wallpaperFit: "cover" | "contain";
+  /** 启动后从 GitHub Releases 检查更新 */
+  autoCheckUpdate: boolean;
+  /** 用户点「稍后」跳过的版本号（不含 v） */
+  skippedUpdateTag: string | null;
 }
 
 export const STATUS_LABELS: Record<Task["status"], string> = {

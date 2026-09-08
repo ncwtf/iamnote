@@ -30,6 +30,12 @@ fn open_devtools(window: tauri::WebviewWindow) {
     window.open_devtools();
 }
 
+/// 本机 CPU 架构，用于挑选 GitHub Release 安装包
+#[tauri::command]
+fn host_arch() -> &'static str {
+    std::env::consts::ARCH
+}
+
 fn show_main_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
@@ -66,7 +72,8 @@ pub fn run() {
             write_file,
             read_file,
             file_exists,
-            open_devtools
+            open_devtools,
+            host_arch
         ])
         .setup(|app| {
             #[cfg(target_os = "macos")]
