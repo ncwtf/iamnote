@@ -4,6 +4,8 @@ import { storageGet, storageSet } from "../lib/storage";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { enable, disable } from "@tauri-apps/plugin-autostart";
 import { register, unregister, isRegistered } from "@tauri-apps/plugin-global-shortcut";
+import { isMac } from "../lib/platform";
+import { toGlobalShortcut } from "../lib/shortcut";
 
 interface SettingsState {
   settings: Settings;
@@ -18,18 +20,26 @@ interface SettingsState {
   markSynced: () => Promise<void>;
   updateLastModified: () => Promise<void>;
   markAutoArchived: (yearMonth: string) => Promise<void>;
+  setWallpaper: (patch: Partial<Pick<Settings,
+    "wallpaperData" | "wallpaperOpacity" | "wallpaperMask" | "wallpaperBlur" | "wallpaperFit"
+  >>) => Promise<void>;
 }
 
 const DEFAULT_SETTINGS: Settings = {
   alwaysOnTop: false,
   autoStart: false,
-  shortcutAddTask: "Ctrl+N",
+  shortcutAddTask: isMac ? "Super+N" : "Ctrl+N",
   shortcutToggleWindow: "",
   syncEnabled: false,
   syncFolderPath: "",
   syncLastModifiedAt: null,
   syncLastSyncedAt: null,
   lastAutoArchiveMonth: null,
+  wallpaperData: null,
+  wallpaperOpacity: 0.45,
+  wallpaperMask: 0.82,
+  wallpaperBlur: 0,
+  wallpaperFit: "cover",
 };
 
 // 互斥锁：防止快捷键短时间内重复触发导致 hide→show 闪烁
@@ -60,20 +70,22 @@ async function doToggleWindow() {
 
 async function registerToggleShortcut(shortcut: string) {
   if (!shortcut) return;
+  const accel = toGlobalShortcut(shortcut);
   try {
-    const already = await isRegistered(shortcut);
+    const already = await isRegistered(accel);
     if (already) return;
-    await register(shortcut, doToggleWindow);
+    await register(accel, doToggleWindow);
   } catch (e) {
-    console.warn("注册全局快捷键失败:", shortcut, e);
+    console.warn("注册全局快捷键失败:", accel, e);
   }
 }
 
 async function unregisterShortcut(shortcut: string) {
   if (!shortcut) return;
+  const accel = toGlobalShortcut(shortcut);
   try {
-    const already = await isRegistered(shortcut);
-    if (already) await unregister(shortcut);
+    const already = await isRegistered(accel);
+    if (already) await unregister(accel);
   } catch {}
 }
 
@@ -164,4 +176,19 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     set({ settings });
     await storageSet("settings", settings);
   },
+
+  setWallpaper: async (patch) => {
+    const settings = { ...get().settings, ...patch };
+    set({ settings });
+    persistWallpaperSoon();
+  },
 }));
+
+let wallpaperPersistTimer: ReturnType<typeof setTimeout> | null = null;
+function persistWallpaperSoon() {
+  if (wallpaperPersistTimer) clearTimeout(wallpaperPersistTimer);
+  wallpaperPersistTimer = setTimeout(() => {
+    const settings = useSettingsStore.getState().settings;
+    void storageSet("settings", settings);
+  }, 280);
+}

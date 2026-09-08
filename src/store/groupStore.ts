@@ -12,6 +12,7 @@ interface GroupState {
   updateGroup: (id: string, patch: Partial<Pick<Group, "name" | "color">>) => void;
   deleteGroup: (id: string) => void;
   setActive: (id: string) => void;
+  reorderGroups: (orderedIds: string[]) => void;
   replaceAll: (groups: Group[]) => Promise<void>;
 }
 
@@ -23,7 +24,11 @@ export const useGroupStore = create<GroupState>((set, get) => ({
   load: async () => {
     const saved = await storageGet<Group[]>("groups");
     if (saved && saved.length > 0) {
-      set({ groups: saved, activeGroupId: saved[0].id, loaded: true });
+      const groups = saved
+        .map((g, i) => ({ ...g, order: typeof g.order === "number" ? g.order : i }))
+        .sort((a, b) => a.order - b.order)
+        .map((g, i) => ({ ...g, order: i }));
+      set({ groups, activeGroupId: groups[0].id, loaded: true });
     } else {
       const defaultGroup: Group = {
         id: uuidv4(),
@@ -65,6 +70,20 @@ export const useGroupStore = create<GroupState>((set, get) => ({
   },
 
   setActive: (id) => set({ activeGroupId: id }),
+
+  reorderGroups: (orderedIds) => {
+    const map = new Map(get().groups.map((g) => [g.id, g]));
+    const updated: Group[] = [];
+    for (const id of orderedIds) {
+      const g = map.get(id);
+      if (g) updated.push({ ...g, order: updated.length });
+    }
+    for (const g of get().groups) {
+      if (!orderedIds.includes(g.id)) updated.push({ ...g, order: updated.length });
+    }
+    set({ groups: updated });
+    storageSet("groups", updated);
+  },
 
   replaceAll: async (groups) => {
     const newActive = groups[0]?.id ?? null;

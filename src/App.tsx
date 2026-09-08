@@ -11,9 +11,12 @@ import { ArchiveView } from "./components/ArchiveView/ArchiveView";
 import { SettingsPanel } from "./components/SettingsPanel/SettingsPanel";
 import { OverviewView } from "./components/OverviewView/OverviewView";
 import { FAVORITES_GROUP_ID, ARCHIVE_GROUP_ID, OVERVIEW_GROUP_ID, toYearMonth, isEnded } from "./types";
-import { ui } from "./theme";
-import { buildShortcutString } from "./lib/shortcut";
+import { buildGroupTheme, SYSTEM_ACCENTS, ui } from "./theme";
+import { GroupThemeProvider } from "./lib/groupTheme";
+import { isMac } from "./lib/platform";
+import { matchesShortcut } from "./lib/shortcut";
 import { writeSyncFile, resolveOnStartup } from "./lib/sync";
+import { CANVAS_RGB, wash } from "./lib/wallpaper";
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
@@ -142,7 +145,7 @@ function App() {
       if (e.key === "F12") {
         e.preventDefault(); // 屏蔽 F12
       }
-      if (e.ctrlKey && e.altKey && e.code === "KeyL") {
+      if ((e.ctrlKey || e.metaKey) && e.altKey && e.code === "KeyL") {
         e.preventDefault();
         invoke("open_devtools").catch(() => {});
       }
@@ -256,7 +259,7 @@ function App() {
     const handler = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
-      if (buildShortcutString(e) === settings.shortcutAddTask) {
+      if (matchesShortcut(e, settings.shortcutAddTask)) {
         e.preventDefault();
         addTaskTriggerRef.current?.();
       }
@@ -293,18 +296,59 @@ function App() {
   const isArchive   = activeGroupId === ARCHIVE_GROUP_ID;
   const isOverview  = activeGroupId === OVERVIEW_GROUP_ID;
   const activeGroup = groups.find((g) => g.id === activeGroupId);
+  const hasWallpaper = !!settings.wallpaperData;
+  const canvasBg = hasWallpaper ? wash(CANVAS_RGB, settings.wallpaperMask) : ui.canvas;
+  const groupTheme = buildGroupTheme(
+    isFavorites
+      ? SYSTEM_ACCENTS.favorites
+      : isArchive
+        ? SYSTEM_ACCENTS.archive
+        : isOverview
+          ? SYSTEM_ACCENTS.overview
+          : activeGroup?.color ?? SYSTEM_ACCENTS.default,
+  );
 
   return (
+    <GroupThemeProvider value={groupTheme}>
     <div
-      className="h-screen w-screen overflow-hidden flex flex-col"
-      style={{
-        borderRadius: 16,
-        boxShadow: ui.shadow,
-        background: ui.sidebar,
-        border: "1px solid rgba(23,23,23,0.10)",
-      }}
+      className="h-screen w-screen overflow-hidden flex flex-col relative"
+      style={
+        isMac
+          ? { background: ui.sidebar }
+          : {
+              borderRadius: 16,
+              boxShadow: ui.shadow,
+              background: ui.sidebar,
+              border: `1px solid ${groupTheme.line}`,
+            }
+      }
     >
-      <div className="flex flex-1 overflow-hidden">
+      {hasWallpaper && (
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            inset: 0,
+            zIndex: 0,
+            pointerEvents: "none",
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              position: "absolute",
+              inset: settings.wallpaperBlur > 0 ? -24 : 0,
+              backgroundImage: `url(${settings.wallpaperData})`,
+              backgroundSize: settings.wallpaperFit,
+              backgroundPosition: "center",
+              backgroundRepeat: "no-repeat",
+              opacity: settings.wallpaperOpacity,
+              filter: settings.wallpaperBlur > 0 ? `blur(${settings.wallpaperBlur}px)` : undefined,
+            }}
+          />
+        </div>
+      )}
+      <div className="flex flex-1 overflow-hidden relative" style={{ zIndex: 1 }}>
         <GroupSidebar
           width={sidebarWidth}
           onWidthChange={handleWidthChange}
@@ -313,7 +357,7 @@ function App() {
           onSettingsClick={() => setShowSettings((v) => !v)}
         />
 
-        <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: ui.canvas }}>
+        <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: canvasBg }}>
           <TitleBar />
 
           {isFavorites ? (
@@ -379,6 +423,7 @@ function App() {
         </div>
       )}
     </div>
+    </GroupThemeProvider>
   );
 }
 

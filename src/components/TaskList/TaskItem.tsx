@@ -5,7 +5,7 @@ import {
   CalendarClock, GripVertical, MoreHorizontal,
 } from "lucide-react";
 import { isEnded, STATUS_LABELS, Task } from "../../types";
-import { statusTone, ui } from "../../theme";
+import { statusTone, tint, ui } from "../../theme";
 import { MetaPill } from "../chrome";
 import { useTaskStore } from "../../store/taskStore";
 import { useStickyPreview } from "../../lib/useStickyPreview";
@@ -138,9 +138,9 @@ function StatusDot({ status, accentColor, onClick, onContextMenuOpen }: {
   if (status === "in-progress") return (
     <button ref={ref} onClick={onClick} onContextMenu={openPicker}
       title="左键循环 · 右键选择状态"
-      style={{ ...base, backgroundColor: "#EFF6FF", borderColor: "#3B82F6" }}
+      style={{ ...base, backgroundColor: tint(accentColor, 0.12), borderColor: accentColor }}
       onMouseEnter={scale("scale(1.12)")} onMouseLeave={scale("scale(1)")}>
-      <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#3B82F6" }} />
+      <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: accentColor }} />
     </button>
   );
   if (status === "cancelled") return (
@@ -183,7 +183,7 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge, dragH
 
   const taskRef = useRef<HTMLDivElement>(null);
   const hasDetail = !!(task.detail?.trim());
-  const { anchorRect: previewRect, scheduleShow, scheduleHide, keepOpen, hide: hidePreview } =
+  const { anchorRect: previewRect, scheduleShow, scheduleHide, keepOpen, hold, releaseHold, hide: hidePreview } =
     useStickyPreview(hasDetail);
 
   const [editAnchor, setEditAnchor] = useState<DOMRect | null>(null);
@@ -216,13 +216,16 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge, dragH
         style={{
           borderBottom: compact ? `1px solid ${ui.line}` : "none",
           background: compact
-            ? (hovered ? "rgba(23,23,23,0.03)" : "transparent")
-            : ui.card,
+            ? (hovered ? tint(accentColor, 0.08) : "transparent")
+            : hovered ? tint(accentColor, 0.07) : ui.card,
           borderRadius: compact ? 0 : 16,
-          boxShadow: compact ? "none" : (hovered ? ui.cardHover : ui.cardShadow),
-          transform: !compact && hovered ? "translateY(-1px)" : "none",
+          boxShadow: compact
+            ? "none"
+            : hovered
+              ? `0 0 0 1.5px ${tint(accentColor, 0.42)}, 0 8px 20px ${tint(accentColor, 0.12)}`
+              : ui.cardShadow,
           marginBottom: compact ? 0 : 10,
-          transition: "background 0.15s, box-shadow 0.15s, transform 0.15s",
+          transition: "background 0.15s, box-shadow 0.15s",
         }}
       >
         <div style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: `${py}px 14px` }}>
@@ -315,6 +318,19 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge, dragH
                     <CalendarClock size={10} /> {friendlyDate(task.nextDueAt)}
                   </MetaPill>
                 )}
+                <span style={{ fontSize: 11, color: ui.faint, alignSelf: "center" }}>
+                  创建 {fmt(task.createdAt)}
+                </span>
+                {task.completedAt && task.status === "done" && (
+                  <span style={{ fontSize: 11, color: "#059669", alignSelf: "center" }}>
+                    完成 {fmt(task.completedAt)}
+                  </span>
+                )}
+                {task.completedAt && task.status === "cancelled" && (
+                  <span style={{ fontSize: 11, color: ui.muted, alignSelf: "center" }}>
+                    取消 {fmt(task.completedAt)}
+                  </span>
+                )}
               </div>
             )}
 
@@ -325,18 +341,6 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge, dragH
                 )}
                 {task.status === "cancelled" && (
                   <MetaPill color={ui.muted} bg="rgba(23,23,23,0.06)">已取消</MetaPill>
-                )}
-              </div>
-            )}
-
-            {!compact && hovered && (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 5 }}>
-                <span style={{ fontSize: 11, color: ui.faint }}>创建 {fmt(task.createdAt)}</span>
-                {task.completedAt && task.status === "done" && (
-                  <span style={{ fontSize: 11, color: "#059669" }}>完成 {fmt(task.completedAt)}</span>
-                )}
-                {task.completedAt && task.status === "cancelled" && (
-                  <span style={{ fontSize: 11, color: ui.muted }}>取消 {fmt(task.completedAt)}</span>
                 )}
               </div>
             )}
@@ -380,6 +384,8 @@ export function TaskItem({ task, accentColor, compact = false, groupBadge, dragH
           anchorRect={previewRect}
           content={task.detail}
           onKeepOpen={keepOpen}
+          onHold={hold}
+          onReleaseHold={releaseHold}
           onMouseLeave={scheduleHide}
           onDismiss={hidePreview}
         />

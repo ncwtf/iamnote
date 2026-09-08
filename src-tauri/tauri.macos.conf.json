@@ -1,0 +1,25 @@
+{
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "iamnote",
+        "width": 620,
+        "height": 820,
+        "minWidth": 380,
+        "minHeight": 500,
+        "decorations": true,
+        "transparent": false,
+        "hiddenTitle": true,
+        "titleBarStyle": "Overlay",
+        "acceptFirstMouse": true,
+        "trafficLightPosition": {
+          "x": 16,
+          "y": 18
+        },
+        "resizable": true,
+        "alwaysOnTop": false
+      }
+    ]
+  }
+}

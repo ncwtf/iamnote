@@ -40,16 +40,28 @@ export function useStickyPreview(enabled: boolean) {
     }, 300);
   }, [enabled]);
 
+  const heldRef = useRef(false);
+
   /** 鼠标移入预览：取消关闭 */
   const keepOpen = useCallback(() => {
     if (hideTimer.current) clearTimeout(hideTimer.current);
   }, []);
 
+  const hold = useCallback(() => {
+    heldRef.current = true;
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+  }, []);
+
+  const releaseHold = useCallback(() => {
+    heldRef.current = false;
+  }, []);
+
   /** 离开任务或预览：短暂缓冲后关闭（方便移入预览框） */
   const scheduleHide = useCallback(() => {
+    if (heldRef.current) return;
     if (showTimer.current) clearTimeout(showTimer.current);
     if (hideTimer.current) clearTimeout(hideTimer.current);
-    hideTimer.current = setTimeout(() => hideFn.current(), 160);
+    hideTimer.current = setTimeout(() => hideFn.current(), 180);
   }, []);
 
   useEffect(() => () => {
@@ -58,5 +70,5 @@ export function useStickyPreview(enabled: boolean) {
     release(hideFn.current);
   }, []);
 
-  return { anchorRect, scheduleShow, scheduleHide, keepOpen, hide };
+  return { anchorRect, scheduleShow, scheduleHide, keepOpen, hold, releaseHold, hide };
 }

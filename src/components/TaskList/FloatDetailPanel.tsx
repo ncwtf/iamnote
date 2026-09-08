@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, type CSSProperties } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { X, GripHorizontal } from "lucide-react";
 import ReactMarkdown from "react-markdown";
@@ -8,6 +8,20 @@ import rehypeHighlight from "rehype-highlight";
 import "highlight.js/styles/github.css";
 import { Task } from "../../types";
 import { useTaskStore } from "../../store/taskStore";
+import {
+  availableSideWidth,
+  getScreenWorkBounds,
+  hideHoverPreviewWindow,
+  isTauriRuntime,
+  listenAppUnfocus,
+  listenPreviewHold,
+  listenPreviewPointer,
+  preferredPreviewHeight,
+  preferredPreviewWidth,
+  showHoverPreviewWindow,
+  taskRectToScreen,
+} from "../../lib/hoverPreviewWindow";
+import { isMac } from "../../lib/platform";
 
 // ─────────────────────────────────────────────────────────
 // 1. 点击触发的编辑浮窗
@@ -153,7 +167,7 @@ export function FloatDetailPanel({ task, accentColor, anchorRect, onClose }: Flo
       </div>
 
       <div style={{ padding: "4px 12px", background: "#FAFAFA", borderTop: "1px solid rgba(0,0,0,0.06)", fontSize: 11, color: "#C4C4C4", flexShrink: 0 }}>
-        Ctrl+Enter 保存 · Esc 关闭并自动保存 · 可拖动标题栏移动窗口
+        {isMac ? "⌘+Enter" : "Ctrl+Enter"} 保存 · Esc 关闭并自动保存 · 可拖动标题栏移动窗口
       </div>
     </div>,
     document.body
@@ -163,14 +177,17 @@ export function FloatDetailPanel({ task, accentColor, anchorRect, onClose }: Flo
 // ─────────────────────────────────────────────────────────
 // 2. 悬停触发的只读预览气泡（失焦才关，宽度对齐任务区）
 // ─────────────────────────────────────────────────────────
-const PREVIEW_GAP = 8;
+const PREVIEW_GAP = 12;
 const PREVIEW_EDGE = 8;
+const PREVIEW_MIN_W = 240;
 
 interface HoverPreviewProps {
   accentColor: string;
   anchorRect: DOMRect;
   content: string;
   onKeepOpen: () => void;
+  onHold?: () => void;
+  onReleaseHold?: () => void;
   /** 鼠标离开预览（可带缓冲） */
   onMouseLeave: () => void;
   /** Esc / 窗口失焦 / 滚动：立刻关 */
@@ -178,41 +195,160 @@ interface HoverPreviewProps {
 }
 
 export function HoverPreview({
-  accentColor, anchorRect, content, onKeepOpen, onMouseLeave, onDismiss,
+  accentColor, anchorRect, content, onKeepOpen, onHold, onReleaseHold, onMouseLeave, onDismiss,
 }: HoverPreviewProps) {
   const boxRef = useRef<HTMLDivElement>(null);
+  const [overlayOk, setOverlayOk] = useState(() => isTauriRuntime());
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onDismiss();
     };
     const onScroll = () => onDismiss();
-    const onBlur = () => onDismiss();
     window.addEventListener("keydown", onKey, true);
     window.addEventListener("scroll", onScroll, true);
-    window.addEventListener("blur", onBlur);
+    let unfocus: (() => void) | undefined;
+    if (isTauriRuntime()) {
+      void listenAppUnfocus(onDismiss).then((fn) => { unfocus = fn; });
+    } else {
+      window.addEventListener("blur", onDismiss);
+    }
     return () => {
       window.removeEventListener("keydown", onKey, true);
       window.removeEventListener("scroll", onScroll, true);
-      window.removeEventListener("blur", onBlur);
+      window.removeEventListener("blur", onDismiss);
+      unfocus?.();
     };
-  }, [onDismiss]);
+  }, [onDismiss, overlayOk]);
 
+  useEffect(() => {
+    if (!overlayOk) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [screen, bounds] = await Promise.all([
+          taskRectToScreen(anchorRect),
+          getScreenWorkBounds(),
+        ]);
+        if (cancelled) return;
+        const sideSpace = availableSideWidth(
+          { left: screen.mainLeft, right: screen.mainRight },
+          bounds,
+        );
+        await showHoverPreviewWindow({
+          content,
+          accentColor,
+          width: preferredPreviewWidth(screen.taskWidth, sideSpace),
+          height: preferredPreviewHeight(screen.mainBottom - screen.mainTop),
+          taskTop: screen.taskTop,
+          taskBottom: screen.taskBottom,
+          mainLeft: screen.mainLeft,
+          mainTop: screen.mainTop,
+          mainRight: screen.mainRight,
+          mainBottom: screen.mainBottom,
+        });
+      } catch {
+        if (!cancelled) setOverlayOk(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      void hideHoverPreviewWindow();
+    };
+  }, [overlayOk, accentColor, anchorRect, content]);
+
+  useEffect(() => {
+    if (!overlayOk) return;
+    let unlisten: (() => void) | undefined;
+    void listenPreviewPointer(onKeepOpen, onMouseLeave).then((fn) => { unlisten = fn; });
+    return () => unlisten?.();
+  }, [overlayOk, onKeepOpen, onMouseLeave]);
+
+  useEffect(() => {
+    if (!overlayOk) return;
+    let unlisten: (() => void) | undefined;
+    void listenPreviewHold((held) => {
+      if (held) onHold?.();
+      else onReleaseHold?.();
+    }).then((fn) => { unlisten = fn; });
+    return () => unlisten?.();
+  }, [overlayOk, onHold, onReleaseHold]);
+
+  if (overlayOk) return null;
+
+  return (
+    <FallbackPreview
+      accentColor={accentColor}
+      anchorRect={anchorRect}
+      content={content}
+      onKeepOpen={onKeepOpen}
+      onHold={onHold}
+      onReleaseHold={onReleaseHold}
+      onMouseLeave={onMouseLeave}
+    />
+  );
+}
+
+function FallbackPreview({
+  accentColor, anchorRect, content, onKeepOpen, onHold, onReleaseHold, onMouseLeave,
+}: {
+  accentColor: string;
+  anchorRect: DOMRect;
+  content: string;
+  onKeepOpen: () => void;
+  onHold?: () => void;
+  onReleaseHold?: () => void;
+  onMouseLeave: () => void;
+}) {
+  const boxRef = useRef<HTMLDivElement>(null);
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  const width = Math.max(240, Math.min(anchorRect.width, vw - PREVIEW_EDGE * 2));
-  let left = anchorRect.left;
-  if (left + width > vw - PREVIEW_EDGE) left = vw - width - PREVIEW_EDGE;
-  if (left < PREVIEW_EDGE) left = PREVIEW_EDGE;
+  const spaceRight = vw - PREVIEW_EDGE - (anchorRect.right + PREVIEW_GAP);
+  const spaceLeft = anchorRect.left - PREVIEW_GAP - PREVIEW_EDGE;
+  const side: "left" | "right" =
+    spaceRight >= PREVIEW_MIN_W || spaceRight >= spaceLeft ? "right" : "left";
+  const sideSpace = Math.max(PREVIEW_MIN_W, side === "right" ? spaceRight : spaceLeft);
+  const initW = Math.max(PREVIEW_MIN_W, Math.min(anchorRect.width, sideSpace, 420));
+  let initL = side === "right" ? anchorRect.right + PREVIEW_GAP : anchorRect.left - initW - PREVIEW_GAP;
+  if (initL + initW > vw - PREVIEW_EDGE) initL = vw - initW - PREVIEW_EDGE;
+  if (initL < PREVIEW_EDGE) initL = PREVIEW_EDGE;
+  const initH = Math.max(160, Math.min(360, vh - PREVIEW_EDGE * 2));
+  let initT = anchorRect.top;
+  if (initT + 80 > vh - PREVIEW_EDGE) initT = Math.max(PREVIEW_EDGE, vh - initH - PREVIEW_EDGE);
+  if (initT < PREVIEW_EDGE) initT = PREVIEW_EDGE;
 
-  const spaceBelow = vh - anchorRect.bottom - PREVIEW_GAP - PREVIEW_EDGE;
-  const spaceAbove = anchorRect.top - PREVIEW_GAP - PREVIEW_EDGE;
-  const above = spaceBelow < 200 && spaceAbove > spaceBelow;
-  const maxH = Math.max(80, Math.min(Math.floor(vh * 0.72), above ? spaceAbove : spaceBelow));
+  const [box, setBox] = useState({ left: initL, top: initT, width: initW, height: initH });
+  const drag = useRef<{ mx: number; my: number; left: number; top: number } | null>(null);
+  const resize = useRef<{ mx: number; my: number; w: number; h: number } | null>(null);
 
-  const posStyle: CSSProperties = above
-    ? { left, width, bottom: vh - anchorRect.top + PREVIEW_GAP, top: "auto", maxHeight: maxH }
-    : { left, width, top: anchorRect.bottom + PREVIEW_GAP, maxHeight: maxH };
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (drag.current) {
+        setBox((b) => ({
+          ...b,
+          left: drag.current!.left + e.clientX - drag.current!.mx,
+          top: drag.current!.top + e.clientY - drag.current!.my,
+        }));
+      } else if (resize.current) {
+        setBox((b) => ({
+          ...b,
+          width: Math.max(PREVIEW_MIN_W, resize.current!.w + e.clientX - resize.current!.mx),
+          height: Math.max(140, resize.current!.h + e.clientY - resize.current!.my),
+        }));
+      }
+    };
+    const onUp = () => {
+      if (drag.current || resize.current) onReleaseHold?.();
+      drag.current = null;
+      resize.current = null;
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, [onReleaseHold]);
 
   return createPortal(
     <div
@@ -221,30 +357,39 @@ export function HoverPreview({
       onMouseLeave={onMouseLeave}
       style={{
         position: "fixed",
-        ...posStyle,
+        left: box.left,
+        top: box.top,
+        width: box.width,
+        height: box.height,
         zIndex: 8500,
-        borderRadius: 10,
-        border: `1px solid ${accentColor}30`,
-        boxShadow: "0 8px 28px rgba(42,39,35,0.10), 0 1px 4px rgba(42,39,35,0.05)",
+        border: `1px solid ${accentColor}55`,
+        boxShadow: "0 10px 28px rgba(42,39,35,0.12)",
         background: "#FFFCF7",
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
-        animation: above ? "hoverPreviewInUp 0.15s ease" : "hoverPreviewIn 0.15s ease",
       }}
     >
-      <div style={{
-        padding: "5px 12px 4px",
-        background: `${accentColor}0d`,
-        borderBottom: `1px solid ${accentColor}18`,
-        fontSize: 10,
-        fontWeight: 700,
-        color: `${accentColor}bb`,
-        letterSpacing: 0.5,
-        flexShrink: 0,
-        userSelect: "none",
-      }}>
-        PREVIEW
+      <div
+        onMouseDown={(e) => {
+          if ((e.target as HTMLElement).closest("[data-resize]")) return;
+          onHold?.();
+          drag.current = { mx: e.clientX, my: e.clientY, left: box.left, top: box.top };
+        }}
+        style={{
+          padding: "7px 12px",
+          background: `linear-gradient(135deg, ${accentColor}22 0%, ${accentColor}0a 100%)`,
+          borderBottom: `1px solid ${accentColor}24`,
+          fontSize: 10,
+          fontWeight: 700,
+          color: accentColor,
+          letterSpacing: 0.5,
+          flexShrink: 0,
+          userSelect: "none",
+          cursor: "grab",
+        }}
+      >
+        PREVIEW · 拖动移动
       </div>
 
       <div
@@ -265,6 +410,17 @@ export function HoverPreview({
           {content}
         </ReactMarkdown>
       </div>
+      <div
+        data-resize
+        onMouseDown={(e) => {
+          e.stopPropagation();
+          onHold?.();
+          resize.current = { mx: e.clientX, my: e.clientY, w: box.width, h: box.height };
+        }}
+        style={{
+          position: "absolute", right: 0, bottom: 0, width: 16, height: 16, cursor: "nwse-resize",
+        }}
+      />
     </div>,
     document.body
   );

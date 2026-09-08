@@ -50,7 +50,7 @@ export function OverviewView() {
   };
 
   return (
-    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: ui.canvas }}>
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: "transparent" }}>
       {/* 顶部栏 */}
       <div style={{ flexShrink: 0 }}>
         <PageHeader title="全部任务" count={allTasks.length} />

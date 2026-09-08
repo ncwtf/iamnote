@@ -71,6 +71,11 @@ export interface Settings {
   syncLastModifiedAt: string | null;
   syncLastSyncedAt: string | null;
   lastAutoArchiveMonth: string | null;
+  wallpaperData: string | null;
+  wallpaperOpacity: number;
+  wallpaperMask: number;
+  wallpaperBlur: number;
+  wallpaperFit: "cover" | "contain";
 }
 
 export const STATUS_LABELS: Record<Task["status"], string> = {
@@ -95,8 +100,17 @@ export function isEnded(status: Task["status"]): boolean {
 }
 
 export const GROUP_COLORS = [
-  "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6",
-  "#ef4444", "#ec4899", "#06b6d4", "#84cc16",
+  "#f59e0b", "#f97316", "#ef4444", "#e11d48", "#ec4899", "#d946ef",
+  "#8b5cf6", "#6366f1", "#3b82f6", "#0ea5e9", "#06b6d4", "#14b8a6",
+  "#10b981", "#22c55e", "#84cc16", "#eab308", "#a3a3a3", "#78716c",
+  "#f43f5e", "#fb7185", "#38bdf8", "#2dd4bf", "#a78bfa", "#64748b",
+];
+
+/** 分组名快速填充 */
+export const GROUP_EMOJIS = [
+  "📁", "💼", "🏠", "📚", "⭐", "🎯", "💡", "🔥",
+  "❤️", "📌", "🛒", "💻", "✈️", "🎵", "🎮", "🍀",
+  "💪", "🌱", "🎨", "📝", "📅", "🚀", "🌙", "☕",
 ];
 
 // ── 工具函数 ──────────────────────────────────────────────

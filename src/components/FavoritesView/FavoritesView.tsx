@@ -24,7 +24,7 @@ export function FavoritesView() {
   });
 
   return (
-    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: ui.canvas }}>
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: "transparent" }}>
       <PageHeader
         title="收藏"
         count={favTasks.length}

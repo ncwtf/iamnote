@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { useGroupTheme } from "../lib/groupTheme";
 import { ui } from "../theme";
 
 export function AppLogo({ size = 26 }: { size?: number }) {
@@ -76,6 +77,7 @@ export function CircleIconBtn({
   title?: string;
   active?: boolean;
 }) {
+  const theme = useGroupTheme();
   return (
     <button
       onClick={onClick}
@@ -87,9 +89,9 @@ export function CircleIconBtn({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        color: active ? ui.accent : ui.muted,
-        background: active ? tintBlue(0.12) : ui.card,
-        border: `1px solid ${active ? tintBlue(0.22) : ui.lineStrong}`,
+        color: active ? theme.color : ui.muted,
+        background: active ? theme.chip : ui.card,
+        border: `1px solid ${active ? theme.line : ui.lineStrong}`,
         boxShadow: active ? "none" : "0 1px 2px rgba(23,23,23,0.04)",
         transition: "background 0.15s, color 0.15s",
       }}
@@ -112,6 +114,7 @@ export function PrimaryBtn({
   children: ReactNode;
   onClick?: () => void;
 }) {
+  const theme = useGroupTheme();
   return (
     <button
       onClick={onClick}
@@ -125,8 +128,8 @@ export function PrimaryBtn({
         fontSize: 13,
         fontWeight: 600,
         color: "#fff",
-        background: ui.accentGrad,
-        boxShadow: ui.accentShadow,
+        background: theme.btnGrad,
+        boxShadow: theme.btnShadow,
         transition: "filter 0.12s, transform 0.12s",
       }}
       onMouseEnter={(e) => {
@@ -152,6 +155,7 @@ export function PageHeader({
   leading?: ReactNode;
   actions?: ReactNode;
 }) {
+  const theme = useGroupTheme();
   return (
     <div
       data-tauri-drag-region
@@ -166,19 +170,26 @@ export function PageHeader({
     >
       <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
         {leading}
-        <span
-          style={{
-            fontSize: 22,
-            fontWeight: 700,
-            letterSpacing: "-0.04em",
-            color: ui.ink,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {title}
-        </span>
+        <div style={{ minWidth: 0 }}>
+          <span
+            style={{
+              fontSize: 22,
+              fontWeight: 700,
+              letterSpacing: "-0.04em",
+              color: ui.ink,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              display: "block",
+            }}
+          >
+            {title}
+          </span>
+          <span style={{
+            display: "block", width: 28, height: 3, borderRadius: 99,
+            background: theme.btnGrad, marginTop: 5,
+          }} />
+        </div>
         {count != null && count > 0 && <CountBadge>{count}</CountBadge>}
       </div>
       {actions && (
@@ -218,9 +229,5 @@ export function MetaPill({
       {children}
     </span>
   );
-}
-
-function tintBlue(alpha: number) {
-  return `rgba(37, 99, 235, ${alpha})`;
 }
 

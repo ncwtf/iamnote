@@ -2,11 +2,12 @@ import type { ReactNode } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Pin, Minus, X } from "lucide-react";
 import { useSettingsStore } from "../../store/settingsStore";
+import { isMac } from "../../lib/platform";
+import { useGroupTheme } from "../../lib/groupTheme";
 import { ui } from "../../theme";
 
 export function TitleBar() {
   const { settings, setAlwaysOnTop } = useSettingsStore();
-  const win = getCurrentWindow();
 
   return (
     <div
@@ -35,14 +36,23 @@ export function TitleBar() {
         >
           <Pin size={13} />
         </TitleButton>
-        <TitleButton onClick={() => win.minimize()} title="最小化">
-          <Minus size={13} />
-        </TitleButton>
-        <TitleButton onClick={() => win.hide()} title="关闭窗口（后台继续运行）" danger>
-          <X size={13} />
-        </TitleButton>
+        {!isMac && <WindowsWindowButtons />}
       </div>
     </div>
+  );
+}
+
+function WindowsWindowButtons() {
+  const win = getCurrentWindow();
+  return (
+    <>
+      <TitleButton onClick={() => win.minimize()} title="最小化">
+        <Minus size={13} />
+      </TitleButton>
+      <TitleButton onClick={() => win.hide()} title="关闭窗口（后台继续运行）" danger>
+        <X size={13} />
+      </TitleButton>
+    </>
   );
 }
 
@@ -59,6 +69,7 @@ function TitleButton({
   active?: boolean;
   danger?: boolean;
 }) {
+  const theme = useGroupTheme();
   return (
     <button
       onClick={onClick}
@@ -70,8 +81,8 @@ function TitleButton({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        color: active ? ui.accent : ui.muted,
-        background: active ? "rgba(59,130,246,0.12)" : "transparent",
+        color: active ? theme.color : ui.muted,
+        background: active ? theme.chip : "transparent",
         transition: "background 0.15s, color 0.15s",
       }}
       onMouseEnter={(e) => {
@@ -82,9 +93,9 @@ function TitleButton({
       }}
       onMouseLeave={(e) => {
         (e.currentTarget as HTMLButtonElement).style.background = active
-          ? "rgba(59,130,246,0.12)"
+          ? theme.chip
           : "transparent";
-        (e.currentTarget as HTMLButtonElement).style.color = active ? ui.accent : ui.muted;
+        (e.currentTarget as HTMLButtonElement).style.color = active ? theme.color : ui.muted;
       }}
     >
       {children}

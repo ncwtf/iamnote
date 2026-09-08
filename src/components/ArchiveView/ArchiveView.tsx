@@ -69,7 +69,7 @@ function ArchivedTaskRow({ task }: { task: ArchivedTask }) {
   const [expanded, setExpanded] = useState(false);
   const rowRef = useRef<HTMLDivElement>(null);
   const hasDetail = !!task.detail?.trim();
-  const { anchorRect: previewRect, scheduleShow, scheduleHide, keepOpen, hide: hidePreview } =
+  const { anchorRect: previewRect, scheduleShow, scheduleHide, keepOpen, hold, releaseHold, hide: hidePreview } =
     useStickyPreview(hasDetail);
   const cancelled = task.status === "cancelled";
 
@@ -169,6 +169,8 @@ function ArchivedTaskRow({ task }: { task: ArchivedTask }) {
           anchorRect={previewRect}
           content={task.detail}
           onKeepOpen={keepOpen}
+          onHold={hold}
+          onReleaseHold={releaseHold}
           onMouseLeave={scheduleHide}
           onDismiss={hidePreview}
         />
@@ -209,7 +211,7 @@ export function ArchiveView({ onArchiveNow, archiving }: ArchiveViewProps) {
   const thisMonth = toYearMonth(new Date());
 
   return (
-    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: ui.canvas }}>
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: "transparent" }}>
       {/* 顶部栏 */}
       <PageHeader
         title="归档"

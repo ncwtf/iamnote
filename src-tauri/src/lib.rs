@@ -55,6 +55,7 @@ pub fn run() {
                         | tauri_plugin_window_state::StateFlags::MAXIMIZED
                         | tauri_plugin_window_state::StateFlags::FULLSCREEN,
                 )
+                .with_denylist(&["hover-preview"])
                 .build(),
         )
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
@@ -68,6 +69,12 @@ pub fn run() {
             open_devtools
         ])
         .setup(|app| {
+            #[cfg(target_os = "macos")]
+            {
+                let app_menu = Menu::default(app.handle())?;
+                app.set_menu(app_menu)?;
+            }
+
             let show_i = MenuItem::with_id(app, "show", "显示", true, None::<&str>)?;
             let quit_i = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show_i, &quit_i])?;
@@ -111,10 +118,18 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                let _ = window.hide();
-                api.prevent_close();
+                if window.label() == "main" {
+                    let _ = window.hide();
+                    api.prevent_close();
+                }
             }
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen { .. } = event {
+                show_main_window(app);
+            }
+        });
 }

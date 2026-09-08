@@ -20,6 +20,24 @@ body,
   color: #171717;
 }
 
+html.preview-page,
+html.preview-page body,
+html.preview-page #root {
+  height: 100%;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  background: transparent;
+}
+
+html.is-mac,
+html.is-mac body,
+html.is-mac #root {
+  background: #f3f2ef;
+  font-family: "SF Pro Text", "PingFang SC", -apple-system, BlinkMacSystemFont,
+    Inter, "Noto Sans SC", "Helvetica Neue", sans-serif;
+}
+
 ::-webkit-scrollbar {
   width: 4px;
 }

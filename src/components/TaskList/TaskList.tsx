@@ -21,6 +21,7 @@ import { useTaskStore } from "../../store/taskStore";
 import { TaskItem } from "./TaskItem";
 import { Group, Task, isEnded } from "../../types";
 import { ui } from "../../theme";
+import { useGroupTheme } from "../../lib/groupTheme";
 import { CircleIconBtn, PageHeader, PrimaryBtn } from "../chrome";
 
 interface TaskListProps {
@@ -84,6 +85,7 @@ export function TaskList({ group, addTriggerRef }: TaskListProps) {
   const activeCount = allTasks.filter((t) => !isEnded(t.status)).length;
   const cancelledCount = endedTasks.filter((t) => t.status === "cancelled").length;
 
+  const theme = useGroupTheme();
   const startAdd = () => { setIsAdding(true); setNewTitle(""); };
 
   const cycleFilter = () => {
@@ -93,7 +95,7 @@ export function TaskList({ group, addTriggerRef }: TaskListProps) {
   };
 
   return (
-    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: ui.canvas }}>
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: "transparent" }}>
       <PageHeader
         title={group.name}
         count={activeCount}
@@ -149,10 +151,10 @@ export function TaskList({ group, addTriggerRef }: TaskListProps) {
               display: "flex", alignItems: "center", gap: 10,
               padding: "14px 16px",
               marginBottom: 10,
-              background: ui.card,
+              background: theme.card,
               borderRadius: 16,
-              border: `1px solid ${tintBlue(0.28)}`,
-              boxShadow: ui.cardShadow,
+              border: `1px solid ${theme.line}`,
+              boxShadow: theme.cardShadow,
             }}
           >
             <div style={{ width: 20, height: 20, borderRadius: "50%", border: "2px dashed #D1D5DB", flexShrink: 0 }} />
@@ -175,14 +177,14 @@ export function TaskList({ group, addTriggerRef }: TaskListProps) {
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, padding: 40, textAlign: "center" }}>
             <div style={{
               width: 52, height: 52, borderRadius: 16,
-              background: tintBlue(0.10),
+              background: theme.chip,
               display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 16,
             }}>
-              <Plus size={22} color={ui.accent} />
+              <Plus size={22} color={theme.color} />
             </div>
             <p style={{ fontSize: 15, fontWeight: 600, color: ui.inkSoft, marginBottom: 6 }}>还没有便签</p>
             <p style={{ fontSize: 13, color: ui.faint, marginBottom: 16 }}>点右上角「新建任务」，或按快捷键添加</p>
-            <button onClick={startAdd} style={{ fontSize: 13, color: ui.accent, fontWeight: 600 }}>
+            <button onClick={startAdd} style={{ fontSize: 13, color: theme.color, fontWeight: 600 }}>
               + 新建第一个任务
             </button>
           </div>
@@ -259,10 +261,6 @@ export function TaskList({ group, addTriggerRef }: TaskListProps) {
       </div>
     </div>
   );
-}
-
-function tintBlue(alpha: number) {
-  return `rgba(37, 99, 235, ${alpha})`;
 }
 
 function SortableTaskSection({

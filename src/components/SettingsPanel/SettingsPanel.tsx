@@ -1,13 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
-import { X, Pin, Power, Keyboard, Eye, Download, Upload, CheckCircle, AlertCircle, Cloud, FolderOpen, RefreshCw } from "lucide-react";
+import { X, Pin, Power, Keyboard, Eye, Download, Upload, CheckCircle, AlertCircle, Cloud, FolderOpen, RefreshCw, Image as ImageIcon } from "lucide-react";
 import { useSettingsStore } from "../../store/settingsStore";
 import { useGroupStore } from "../../store/groupStore";
 import { useTaskStore } from "../../store/taskStore";
-import { buildShortcutString } from "../../lib/shortcut";
+import { buildShortcutString, formatShortcut } from "../../lib/shortcut";
+import { isMac } from "../../lib/platform";
 import { exportBackup, importBackup } from "../../lib/importExport";
 import { pickSyncFolder, writeSyncFile } from "../../lib/sync";
 import { ui } from "../../theme";
+import { fileToWallpaperDataUrl } from "../../lib/wallpaper";
 
 interface SettingsPanelProps {
   onClose: () => void;
@@ -74,7 +76,8 @@ function ShortcutRecorder({ value, onChange, placeholder = "点击设置快捷�
         setRecording(false);
       } else {
         // 只有修饰键，继续等待
-        setPending(parts.filter((p) => modifiers.includes(p)).join("+") + " + ...");
+        const mods = parts.filter((p) => modifiers.includes(p)).join("+");
+        setPending(`${formatShortcut(mods) || mods} + ...`);
       }
     };
 
@@ -82,7 +85,9 @@ function ShortcutRecorder({ value, onChange, placeholder = "点击设置快捷�
     return () => window.removeEventListener("keydown", onKey, true);
   }, [recording, onChange]);
 
-  const display = recording ? (pending || "请按快捷键...") : (value || placeholder);
+  const display = recording
+    ? (pending || "请按快捷键...")
+    : (value ? formatShortcut(value) : placeholder);
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -203,6 +208,175 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
     }}>
       {children}
     </p>
+  );
+}
+
+function SliderRow({
+  label, value, min, max, step, suffix, onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  suffix: string;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0" }}>
+      <span style={{ width: 72, fontSize: 12, color: ui.muted, flexShrink: 0 }}>{label}</span>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        style={{ flex: 1, accentColor: "#3B82F6" }}
+      />
+      <span style={{ width: 40, textAlign: "right", fontSize: 12, color: ui.inkSoft, flexShrink: 0 }}>
+        {suffix}
+      </span>
+    </div>
+  );
+}
+
+function WallpaperSection({
+  data, opacity, mask, blur, fit, onChange,
+}: {
+  data: string | null;
+  opacity: number;
+  mask: number;
+  blur: number;
+  fit: "cover" | "contain";
+  onChange: (patch: {
+    wallpaperData?: string | null;
+    wallpaperOpacity?: number;
+    wallpaperMask?: number;
+    wallpaperBlur?: number;
+    wallpaperFit?: "cover" | "contain";
+  }) => Promise<void>;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const pick = async (file?: File | null) => {
+    if (!file) return;
+    setBusy(true);
+    setError("");
+    try {
+      const wallpaperData = await fileToWallpaperDataUrl(file);
+      await onChange({ wallpaperData });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "图片处理失败");
+    } finally {
+      setBusy(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  };
+
+  return (
+    <div style={{ padding: "10px 0 6px", borderBottom: "1px solid rgba(0,0,0,0.06)" }}>
+      <div style={{ display: "flex", gap: 12, alignItems: "stretch" }}>
+        <div style={{
+          width: 92, height: 68, borderRadius: 10, flexShrink: 0, overflow: "hidden",
+          background: ui.paperDeep, border: `1px solid ${ui.line}`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          {data ? (
+            <img src={data} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          ) : (
+            <ImageIcon size={20} color={ui.faint} />
+          )}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontSize: 14, fontWeight: 600, color: ui.ink }}>应用背景</p>
+          <p style={{ fontSize: 12, color: ui.muted, marginTop: 2 }}>铺在整个窗口后面，可调透明和模糊</p>
+          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            <button
+              onClick={() => inputRef.current?.click()}
+              disabled={busy}
+              style={{
+                height: 28, padding: "0 10px", borderRadius: 8, fontSize: 12, fontWeight: 600,
+                background: "#3B82F6", color: "#fff",
+              }}
+            >
+              {busy ? "处理中…" : data ? "更换图片" : "选择图片"}
+            </button>
+            {data && (
+              <button
+                onClick={() => { void onChange({ wallpaperData: null }); }}
+                style={{
+                  height: 28, padding: "0 10px", borderRadius: 8, fontSize: 12,
+                  background: ui.paperDeep, color: ui.inkSoft,
+                }}
+              >
+                清除
+              </button>
+            )}
+          </div>
+          {error && <p style={{ fontSize: 11, color: "#EF4444", marginTop: 6 }}>{error}</p>}
+        </div>
+      </div>
+
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif"
+        hidden
+        onChange={(e) => { void pick(e.target.files?.[0]); }}
+      />
+
+      {data && (
+        <div style={{ marginTop: 8 }}>
+          <SliderRow
+            label="不透明度"
+            value={Math.round(opacity * 100)}
+            min={10}
+            max={100}
+            step={1}
+            suffix={`${Math.round(opacity * 100)}%`}
+            onChange={(v) => { void onChange({ wallpaperOpacity: v / 100 }); }}
+          />
+          <SliderRow
+            label="界面遮罩"
+            value={Math.round(mask * 100)}
+            min={40}
+            max={96}
+            step={1}
+            suffix={`${Math.round(mask * 100)}%`}
+            onChange={(v) => { void onChange({ wallpaperMask: v / 100 }); }}
+          />
+          <SliderRow
+            label="模糊"
+            value={blur}
+            min={0}
+            max={24}
+            step={1}
+            suffix={`${blur}px`}
+            onChange={(v) => { void onChange({ wallpaperBlur: v }); }}
+          />
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0 2px" }}>
+            <span style={{ width: 72, fontSize: 12, color: ui.muted }}>显示方式</span>
+            {(["cover", "contain"] as const).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => { void onChange({ wallpaperFit: mode }); }}
+                style={{
+                  height: 26, padding: "0 10px", borderRadius: 7, fontSize: 12,
+                  background: fit === mode ? "rgba(59,130,246,0.12)" : ui.paperDeep,
+                  color: fit === mode ? "#2563EB" : ui.inkSoft,
+                  fontWeight: fit === mode ? 600 : 400,
+                }}
+              >
+                {mode === "cover" ? "铺满" : "适应"}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -487,7 +661,7 @@ function SyncSection() {
 export function SettingsPanel({ onClose }: SettingsPanelProps) {
   const {
     settings,
-    setAlwaysOnTop, setAutoStart,
+    setAlwaysOnTop, setAutoStart, setWallpaper,
     setShortcutAddTask, setShortcutToggleWindow,
   } = useSettingsStore();
   const [appVersion, setAppVersion] = useState("");
@@ -549,6 +723,16 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
           color="#10B981"
         />
 
+        <SectionTitle>背景图片</SectionTitle>
+        <WallpaperSection
+          data={settings.wallpaperData}
+          opacity={settings.wallpaperOpacity}
+          mask={settings.wallpaperMask}
+          blur={settings.wallpaperBlur}
+          fit={settings.wallpaperFit}
+          onChange={setWallpaper}
+        />
+
         {/* 快捷键 */}
         <SectionTitle>快捷键</SectionTitle>
         <ShortcutRow
@@ -574,7 +758,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
         }}>
           <p style={{ fontSize: 12, color: "#0369A1", lineHeight: 1.6 }}>
             💡 点击快捷键框后按下组合键即可录制。
-            需要至少一个修饰键（Ctrl / Alt / Shift）。
+            需要至少一个修饰键（{isMac ? "⌘ / ⌥ / ⇧" : "Ctrl / Alt / Shift"}）。
             按 Esc 取消录制。
           </p>
         </div>
