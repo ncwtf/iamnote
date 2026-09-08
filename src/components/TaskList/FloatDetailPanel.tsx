@@ -197,7 +197,6 @@ interface HoverPreviewProps {
 export function HoverPreview({
   accentColor, anchorRect, content, onKeepOpen, onHold, onReleaseHold, onMouseLeave, onDismiss,
 }: HoverPreviewProps) {
-  const boxRef = useRef<HTMLDivElement>(null);
   const [overlayOk, setOverlayOk] = useState(() => isTauriRuntime());
 
   useEffect(() => {

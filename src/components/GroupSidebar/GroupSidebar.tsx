@@ -572,7 +572,7 @@ function ColorPicker({
   );
 }
 
-function navStyle(active: boolean, accent = ui.accent): CSSProperties {
+function navStyle(active: boolean, accent: string = ui.accent): CSSProperties {
   const theme = buildGroupTheme(accent);
   return {
     display: "flex",

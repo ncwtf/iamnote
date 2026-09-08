@@ -18,13 +18,13 @@ export function buildShortcutString(e: KeyboardEvent): string {
 /** 设置页展示：Mac 上 Super 显示为 ⌘ */
 export function formatShortcut(shortcut: string): string {
   if (!shortcut) return "";
-  if (!isMac) return shortcut.replaceAll("Super", "Win");
+  if (!isMac) return shortcut.replace(/Super/g, "Win");
   return shortcut
-    .replaceAll("Super", "⌘")
-    .replaceAll("Ctrl", "⌃")
-    .replaceAll("Alt", "⌥")
-    .replaceAll("Shift", "⇧")
-    .replaceAll("+", "");
+    .replace(/Super/g, "⌘")
+    .replace(/Ctrl/g, "⌃")
+    .replace(/Alt/g, "⌥")
+    .replace(/Shift/g, "⇧")
+    .replace(/\+/g, "");
 }
 
 /** 比较按键与已保存快捷键。Mac 上 Ctrl+N 与 ⌘N 视为同一默认组合。 */
@@ -35,8 +35,8 @@ export function matchesShortcut(e: KeyboardEvent, shortcut: string): boolean {
   if (!isMac) return false;
   const aliases = new Set([
     shortcut,
-    shortcut.replaceAll("Ctrl+", "Super+"),
-    shortcut.replaceAll("Super+", "Ctrl+"),
+    shortcut.replace(/Ctrl\+/g, "Super+"),
+    shortcut.replace(/Super\+/g, "Ctrl+"),
   ]);
   return aliases.has(actual);
 }
@@ -44,6 +44,6 @@ export function matchesShortcut(e: KeyboardEvent, shortcut: string): boolean {
 /** 注册全局快捷键时，把 Super 转成插件认识的 Command */
 export function toGlobalShortcut(shortcut: string): string {
   if (!shortcut) return shortcut;
-  if (isMac) return shortcut.replaceAll("Super+", "Command+");
+  if (isMac) return shortcut.replace(/Super\+/g, "Command+");
   return shortcut;
 }
